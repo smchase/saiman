@@ -1,0 +1,23 @@
+# Environment variables (contains secrets)
+.env
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# SQLite database
+*.db
+*.db-shm
+*.db-wal
+
+# Misc
+*.swp
+*~
