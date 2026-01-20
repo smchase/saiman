@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		C1000001 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = C2000001 /* MarkdownUI */; };
+		C1000002 /* LaTeXSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = C2000002 /* LaTeXSwiftUI */; };
+		A1000030 /* ContentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000030; };
 		A1000001 /* SaimanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001; };
 		A1000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002; };
 		A1000003 /* SpotlightPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000003; };
@@ -89,6 +91,7 @@
 		B2000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		B2000002 /* Evals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Evals.swift; sourceTree = "<group>"; };
 		B3000001 /* SaimanTests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SaimanTests; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000030 /* ContentParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentParser.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +100,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C1000001 /* MarkdownUI in Frameworks */,
+				C1000002 /* LaTeXSwiftUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +131,7 @@
 				A5000005 /* Agent */,
 				A5000006 /* Services */,
 				A5000007 /* Models */,
+				A5000010 /* Utilities */,
 				A5000009 /* Resources */,
 				A3000002 /* Saiman.entitlements */,
 				A3000003 /* Info.plist */,
@@ -221,6 +226,14 @@
 			path = SaimanTests;
 			sourceTree = "<group>";
 		};
+		A5000010 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				A2000030 /* ContentParser.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -239,6 +252,7 @@
 			name = Saiman;
 			packageProductDependencies = (
 				C2000001 /* MarkdownUI */,
+				C2000002 /* LaTeXSwiftUI */,
 			);
 			productName = Saiman;
 			productReference = A3000001 /* Saiman.app */;
@@ -289,6 +303,7 @@
 			mainGroup = A5000001;
 			packageReferences = (
 				C3000001 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+				C3000002 /* XCRemoteSwiftPackageReference "LaTeXSwiftUI" */,
 			);
 			productRefGroup = A5000008 /* Products */;
 			projectDirPath = "";
@@ -342,6 +357,7 @@
 				A1000025 /* AttachmentManager.swift in Sources */,
 				A1000028 /* TokenTracker.swift in Sources */,
 				A1000029 /* GetPageContentsTool.swift in Sources */,
+				A1000030 /* ContentParser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -608,6 +624,14 @@
 				minimumVersion = 2.0.0;
 			};
 		};
+		C3000002 /* XCRemoteSwiftPackageReference "LaTeXSwiftUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/colinc86/LaTeXSwiftUI";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -615,6 +639,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C3000001 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
 			productName = MarkdownUI;
+		};
+		C2000002 /* LaTeXSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C3000002 /* XCRemoteSwiftPackageReference "LaTeXSwiftUI" */;
+			productName = LaTeXSwiftUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

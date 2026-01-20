@@ -21,7 +21,6 @@ struct MessageBubble: View {
 
         case .assistant:
             MarkdownView(text: message.content)
-                .foregroundColor(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
         case .system:
