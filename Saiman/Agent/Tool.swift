@@ -111,6 +111,7 @@ final class ToolRegistry {
     init() {
         // Register default tools
         register(WebSearchTool())
+        register(GetPageContentsTool())
     }
 
     func register(_ tool: any Tool) {

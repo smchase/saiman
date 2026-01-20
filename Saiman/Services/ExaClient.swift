@@ -1,38 +1,17 @@
 import Foundation
 
-// MARK: - Search Depth Configuration
+// MARK: - Search Configuration
 
-enum SearchDepth: String {
-    case quick  // Fast factual lookups
-    case deep   // Comprehensive research
+enum SearchType: String {
+    case fast   // Quick lookups, <500ms
+    case auto   // Balanced quality/speed (default)
+    case deep   // Comprehensive research, several seconds
+}
 
-    var numResults: Int {
-        switch self {
-        case .quick: return 5
-        case .deep: return 10
-        }
-    }
-
-    var maxCharacters: Int {
-        switch self {
-        case .quick: return 3000
-        case .deep: return 10000
-        }
-    }
-
-    var searchType: String {
-        switch self {
-        case .quick: return "auto"
-        case .deep: return "deep"
-        }
-    }
-
-    var livecrawl: String? {
-        switch self {
-        case .quick: return nil  // Use default/cached
-        case .deep: return "preferred"  // Try fresh content
-        }
-    }
+enum LivecrawlMode: String {
+    case fallback   // Use cached content first (faster, default)
+    case preferred  // Try fresh content (for current events)
+    case always     // Force fresh crawl (real-time data)
 }
 
 // MARK: - Exa API Types
@@ -59,6 +38,12 @@ struct ExaSearchRequest: Encodable {
     }
 }
 
+struct ExaContentsRequest: Encodable {
+    let urls: [String]
+    let text: ExaTextOptions
+    let livecrawl: String?
+}
+
 struct ExaContentsOptions: Encodable {
     let text: ExaTextOptions
 }
@@ -72,6 +57,10 @@ struct ExaTextOptions: Encodable {
 }
 
 struct ExaSearchResponse: Decodable {
+    let results: [ExaResult]
+}
+
+struct ExaContentsResponse: Decodable {
     let results: [ExaResult]
 }
 
@@ -94,7 +83,20 @@ final class ExaClient {
     private let config = Config.shared
     private let baseURL = "https://api.exa.ai"
 
-    func search(query: String, depth: SearchDepth = .quick) async throws -> [ExaResult] {
+    /// Search the web with configurable parameters
+    /// - Parameters:
+    ///   - query: The search query
+    ///   - numResults: Number of results (1-50, default 5)
+    ///   - maxCharacters: Max characters per result (default 2000)
+    ///   - searchType: Search type - fast, auto, or deep (default auto)
+    ///   - livecrawl: Livecrawl mode - fallback, preferred, or always (default fallback)
+    func search(
+        query: String,
+        numResults: Int = 5,
+        maxCharacters: Int = 2000,
+        searchType: SearchType = .auto,
+        livecrawl: LivecrawlMode = .fallback
+    ) async throws -> [ExaResult] {
         let url = URL(string: "\(baseURL)/search")!
 
         var request = URLRequest(url: url)
@@ -104,12 +106,12 @@ final class ExaClient {
 
         let searchRequest = ExaSearchRequest(
             query: query,
-            type: depth.searchType,
-            numResults: depth.numResults,
+            type: searchType.rawValue,
+            numResults: numResults,
             contents: ExaContentsOptions(
-                text: ExaTextOptions(maxCharacters: depth.maxCharacters)
+                text: ExaTextOptions(maxCharacters: maxCharacters)
             ),
-            livecrawl: depth.livecrawl
+            livecrawl: livecrawl.rawValue
         )
 
         request.httpBody = try JSONEncoder().encode(searchRequest)
@@ -127,6 +129,46 @@ final class ExaClient {
 
         let searchResponse = try JSONDecoder().decode(ExaSearchResponse.self, from: data)
         return searchResponse.results
+    }
+
+    /// Fetch contents from specific URLs
+    /// - Parameters:
+    ///   - urls: Array of URLs to fetch
+    ///   - maxCharacters: Max characters per page (default 5000)
+    ///   - livecrawl: Livecrawl mode (default fallback)
+    func getContents(
+        urls: [String],
+        maxCharacters: Int = 5000,
+        livecrawl: LivecrawlMode = .fallback
+    ) async throws -> [ExaResult] {
+        let url = URL(string: "\(baseURL)/contents")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(config.exaApiKey)", forHTTPHeaderField: "Authorization")
+
+        let contentsRequest = ExaContentsRequest(
+            urls: urls,
+            text: ExaTextOptions(maxCharacters: maxCharacters),
+            livecrawl: livecrawl.rawValue
+        )
+
+        request.httpBody = try JSONEncoder().encode(contentsRequest)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ExaError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 {
+            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw ExaError.apiError(statusCode: httpResponse.statusCode, message: errorBody)
+        }
+
+        let contentsResponse = try JSONDecoder().decode(ExaContentsResponse.self, from: data)
+        return contentsResponse.results
     }
 }
 

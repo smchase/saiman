@@ -123,20 +123,20 @@ func testExa() async {
 
     let client = ExaClient()
 
-    // Quick search
+    // Fast search (simple lookup)
     do {
-        let results = try await client.search(query: "current weather", depth: .quick)
-        print("   ✓ Quick: \(results.count) results")
+        let results = try await client.search(query: "current weather", searchType: .fast, livecrawl: .preferred)
+        print("   ✓ Fast search: \(results.count) results")
     } catch {
-        print("   ❌ Quick: \(error.localizedDescription)")
+        print("   ❌ Fast search: \(error.localizedDescription)")
     }
 
-    // Deep search
+    // Deep search (comprehensive)
     do {
-        let results = try await client.search(query: "Swift concurrency patterns", depth: .deep)
-        print("   ✓ Deep: \(results.count) results")
+        let results = try await client.search(query: "Swift concurrency patterns", numResults: 10, searchType: .deep)
+        print("   ✓ Deep search: \(results.count) results")
     } catch {
-        print("   ❌ Deep: \(error.localizedDescription)")
+        print("   ❌ Deep search: \(error.localizedDescription)")
     }
 }
 

@@ -184,13 +184,12 @@ final class Config {
         formatter.dateFormat = "EEEE, MMMM d, yyyy 'at' h:mm a"
         let dateTime = formatter.string(from: Date())
 
+        // Dynamic context prepended to base prompt
+        // All style/methodology guidance lives in system_prompt.txt
         let context = """
             ## Context
             - Current date and time: \(dateTime)
             - User's location: \(userLocation)
-
-            ## Response Style
-            Be concise. Give the shortest accurate answer unless the user explicitly asks for detail or explanation. Avoid unnecessary preamble, caveats, or filler.
 
             """
 

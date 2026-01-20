@@ -1,36 +1,56 @@
 import Foundation
 
 /// Web search tool powered by Exa AI.
-/// Allows the agent to search the web for current information.
+/// Allows the agent to search the web for current information with configurable parameters.
 final class WebSearchTool: Tool {
     let name = "web_search"
 
     let description = """
-        Search the web for information. Use this when you need current information, \
-        facts you're uncertain about, or to research a topic.
+        Search the web using Exa's neural search. Returns raw page content for you to synthesize.
 
-        Choose depth based on your needs:
-        - "quick": Fast factual lookups (5 results, brief content). Use for simple facts, \
-        definitions, current events.
-        - "deep": Comprehensive research (10 results, full content). Use for complex questions, \
-        analysis requiring multiple sources, technical/legal topics.
+        When to use:
+        - Information likely outdated or changed since August 2025
+        - Facts you're uncertain about (dates, statistics, current status)
+        - Current events, news, prices, recent developments
+        - Technical docs, APIs, or specs that update frequently
 
-        For complex topics, make multiple searches with different angles rather than one broad search. \
-        Be specific in your queries - include relevant terms, dates, or source types in the query text.
+        When NOT to use:
+        - You confidently know the answer
+        - Reasoning, analysis, math, or creative tasks
+        - Well-established facts within your training data
         """
 
     let parameters: [ToolParameter] = [
         ToolParameter(
             name: "query",
             type: .string,
-            description: "The search query. Be specific and targeted for better results. Include relevant context like dates, technical terms, or source types."
+            description: "The search query. Be specific and targeted for better results."
         ),
         ToolParameter(
-            name: "depth",
+            name: "num_results",
+            type: .integer,
+            description: "Number of results to return (1-50). Default: 5. Use 3-5 for simple facts, 10-20 for research.",
+            required: false
+        ),
+        ToolParameter(
+            name: "max_characters",
+            type: .integer,
+            description: "Max characters of content per result. Default: 2000. Use 1000-2000 for quick answers, 5000+ for detailed content.",
+            required: false
+        ),
+        ToolParameter(
+            name: "search_type",
             type: .string,
-            description: "Search depth: 'quick' for fast factual lookups, 'deep' for comprehensive research requiring multiple detailed sources.",
+            description: "Search type. Default: 'auto'. Options: 'fast' (<500ms, quick lookups), 'auto' (balanced), 'deep' (comprehensive, several seconds).",
             required: false,
-            enumValues: ["quick", "deep"]
+            enumValues: ["fast", "auto", "deep"]
+        ),
+        ToolParameter(
+            name: "livecrawl",
+            type: .string,
+            description: "Content freshness. Default: 'fallback' (cached, faster). Use 'preferred' for current events, 'always' for real-time data.",
+            required: false,
+            enumValues: ["fallback", "preferred", "always"]
         )
     ]
 
@@ -39,25 +59,61 @@ final class WebSearchTool: Tool {
     func execute(arguments: String) async throws -> String {
         // Parse arguments
         guard let data = arguments.data(using: .utf8),
-              let args = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let query = args["query"] as? String else {
-            throw ToolError.invalidArguments("Missing required 'query' parameter")
+              let args = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ToolError.invalidArguments("Failed to parse arguments as JSON")
         }
 
-        // Parse depth (default to quick)
-        let depthString = args["depth"] as? String ?? "quick"
-        let depth: SearchDepth = depthString == "deep" ? .deep : .quick
+        guard let query = args["query"] as? String, !query.isEmpty else {
+            throw ToolError.invalidArguments("Missing or empty 'query' parameter. Provide a search query string.")
+        }
+
+        // Parse and validate num_results
+        var numResults = 5
+        if let n = args["num_results"] as? Int {
+            if n < 1 || n > 50 {
+                throw ToolError.invalidArguments("num_results must be between 1 and 50 (got \(n))")
+            }
+            numResults = n
+        }
+
+        // Parse and validate max_characters
+        var maxCharacters = 2000
+        if let m = args["max_characters"] as? Int {
+            if m < 100 || m > 20000 {
+                throw ToolError.invalidArguments("max_characters must be between 100 and 20000 (got \(m))")
+            }
+            maxCharacters = m
+        }
+
+        // Parse search_type with validation
+        let searchTypeStr = args["search_type"] as? String ?? "auto"
+        guard let searchType = SearchType(rawValue: searchTypeStr) else {
+            throw ToolError.invalidArguments("Invalid search_type '\(searchTypeStr)'. Must be one of: fast, auto, deep")
+        }
+
+        // Parse livecrawl with validation
+        let livecrawlStr = args["livecrawl"] as? String ?? "fallback"
+        guard let livecrawl = LivecrawlMode(rawValue: livecrawlStr) else {
+            throw ToolError.invalidArguments("Invalid livecrawl '\(livecrawlStr)'. Must be one of: fallback, preferred, always")
+        }
 
         // Execute search
-        let results = try await exaClient.search(query: query, depth: depth)
+        let results = try await exaClient.search(
+            query: query,
+            numResults: numResults,
+            maxCharacters: maxCharacters,
+            searchType: searchType,
+            livecrawl: livecrawl
+        )
 
         // Format results for the AI
         if results.isEmpty {
             return "No results found for query: \(query)"
         }
 
-        var output = "Search results for: \(query) [depth: \(depthString), \(results.count) results]\n"
-        output += "=" .padding(toLength: 60, withPad: "=", startingAt: 0) + "\n\n"
+        var output = "Search results for: \(query)\n"
+        output += "[type: \(searchTypeStr), results: \(results.count), max_chars: \(maxCharacters)]\n"
+        output += String(repeating: "=", count: 60) + "\n\n"
 
         for (index, result) in results.enumerated() {
             output += "[\(index + 1)] \(result.title ?? "Untitled")\n"
@@ -74,7 +130,7 @@ final class WebSearchTool: Tool {
                 output += "\n\(text)\n"
             }
 
-            output += "\n" + "-" .padding(toLength: 60, withPad: "-", startingAt: 0) + "\n\n"
+            output += "\n" + String(repeating: "-", count: 60) + "\n\n"
         }
 
         return output
