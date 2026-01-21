@@ -50,7 +50,6 @@ struct ChatView: View {
                 }
                 .padding(.top, 9)
             }
-            .frame(maxHeight: 500)
             .onChange(of: viewModel.messages.count) { oldCount, newCount in
                 if newCount > oldCount {
                     scrollToBottom(proxy: proxy)

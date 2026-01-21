@@ -157,7 +157,7 @@ struct ContentParser {
 
         let lines = text.components(separatedBy: "\n")
 
-        for (index, line) in lines.enumerated() {
+        for line in lines {
             let trimmedLine = line.trimmingCharacters(in: .whitespaces)
 
             // Track code block state

@@ -325,7 +325,7 @@ struct SpotlightContentView: View {
             ChatView(viewModel: viewModel)
         }
         .frame(width: 680)
-        .frame(minHeight: 52, maxHeight: 680)
+        .frame(maxHeight: 680)
         .fixedSize(horizontal: false, vertical: true)
         .background(
             ZStack {
