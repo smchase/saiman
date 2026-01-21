@@ -81,8 +81,12 @@ final class Logger {
         }
     }
 
-    func logResponse(_ response: String, toolCalls: Int) {
-        log("API Response - \(response.count) chars, \(toolCalls) tool calls", level: "DEBUG")
+    func logResponse(_ response: String, toolCalls: Int, thinkingBlocks: Int = 0) {
+        var msg = "API Response - \(response.count) chars, \(toolCalls) tool calls"
+        if thinkingBlocks > 0 {
+            msg += ", \(thinkingBlocks) thinking blocks"
+        }
+        log(msg, level: "DEBUG")
     }
 
     func logError(_ error: Error) {

@@ -21,6 +21,7 @@ struct Message: Identifiable, Codable {
     let content: String
     var toolCalls: [ToolCall]?
     var attachments: [Attachment]?
+    var thinkingBlocks: [ThinkingBlock]?
     let createdAt: Date
 
     init(
@@ -30,6 +31,7 @@ struct Message: Identifiable, Codable {
         content: String,
         toolCalls: [ToolCall]? = nil,
         attachments: [Attachment]? = nil,
+        thinkingBlocks: [ThinkingBlock]? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -38,6 +40,7 @@ struct Message: Identifiable, Codable {
         self.content = content
         self.toolCalls = toolCalls
         self.attachments = attachments
+        self.thinkingBlocks = thinkingBlocks
         self.createdAt = createdAt
     }
 }
@@ -49,12 +52,35 @@ extension Message {
             "role": role == .user ? "user" : "assistant"
         ]
 
-        // Check if we need array format (tool calls, attachments, or complex content)
+        // Check if we need array format (tool calls, attachments, thinking blocks, or complex content)
         let hasToolCalls = toolCalls != nil && !toolCalls!.isEmpty
         let hasAttachments = role == .user && attachments != nil && !attachments!.isEmpty
+        let hasThinkingBlocks = role == .assistant && thinkingBlocks != nil && !thinkingBlocks!.isEmpty
 
-        if hasToolCalls || hasAttachments {
+        if hasToolCalls || hasAttachments || hasThinkingBlocks {
             var contentArray: [[String: Any]] = []
+
+            // For assistant messages: thinking blocks MUST come first
+            if role == .assistant, let thinkingBlocks = thinkingBlocks {
+                for block in thinkingBlocks {
+                    if block.type == "thinking" {
+                        var thinkingDict: [String: Any] = ["type": "thinking"]
+                        if let thinking = block.thinking {
+                            thinkingDict["thinking"] = thinking
+                        }
+                        if let signature = block.signature {
+                            thinkingDict["signature"] = signature
+                        }
+                        contentArray.append(thinkingDict)
+                    } else if block.type == "redacted_thinking" {
+                        var redactedDict: [String: Any] = ["type": "redacted_thinking"]
+                        if let data = block.data {
+                            redactedDict["data"] = data
+                        }
+                        contentArray.append(redactedDict)
+                    }
+                }
+            }
 
             // For user messages: add images first (Claude processes them in order)
             if role == .user, let attachments = attachments {

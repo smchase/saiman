@@ -33,6 +33,20 @@ struct ContentBlock: Codable {
     let id: String?
     let name: String?
     let input: [String: AnyCodable]?
+    // Extended thinking fields
+    let thinking: String?
+    let signature: String?
+    // Redacted thinking
+    let data: String?
+}
+
+// MARK: - Thinking Block
+
+struct ThinkingBlock: Codable {
+    let type: String  // "thinking" or "redacted_thinking"
+    let thinking: String?
+    let signature: String?
+    let data: String?  // For redacted thinking
 }
 
 struct AnyCodable: Codable {
@@ -87,6 +101,7 @@ struct AnyCodable: Codable {
 struct AgentResponse {
     let text: String
     let toolCalls: [ToolCall]
+    let thinkingBlocks: [ThinkingBlock]
     let stopReason: String?
     let usage: UsageData?
 }
@@ -158,7 +173,11 @@ final class BedrockClient {
         let agentResponse = parseResponse(bedrockResponse)
 
         // Log the response
-        Logger.shared.logResponse(agentResponse.text, toolCalls: agentResponse.toolCalls.count)
+        Logger.shared.logResponse(
+            agentResponse.text,
+            toolCalls: agentResponse.toolCalls.count,
+            thinkingBlocks: agentResponse.thinkingBlocks.count
+        )
 
         return agentResponse
     }
@@ -170,8 +189,13 @@ final class BedrockClient {
     ) -> [String: Any] {
         var body: [String: Any] = [
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 4096,
-            "system": config.systemPrompt
+            "max_tokens": 21333,
+            "system": config.systemPrompt,
+            // Extended thinking configuration
+            "thinking": [
+                "type": "enabled",
+                "budget_tokens": 16000
+            ]
         ]
 
         // Convert messages, ensuring proper alternation
@@ -264,6 +288,7 @@ final class BedrockClient {
     private func parseResponse(_ response: BedrockResponse) -> AgentResponse {
         var text = ""
         var toolCalls: [ToolCall] = []
+        var thinkingBlocks: [ThinkingBlock] = []
 
         if let content = response.content {
             for block in content {
@@ -272,6 +297,22 @@ final class BedrockClient {
                     if let blockText = block.text {
                         text += blockText
                     }
+                case "thinking":
+                    // Extended thinking block
+                    thinkingBlocks.append(ThinkingBlock(
+                        type: "thinking",
+                        thinking: block.thinking,
+                        signature: block.signature,
+                        data: nil
+                    ))
+                case "redacted_thinking":
+                    // Redacted thinking block (encrypted for safety)
+                    thinkingBlocks.append(ThinkingBlock(
+                        type: "redacted_thinking",
+                        thinking: nil,
+                        signature: nil,
+                        data: block.data
+                    ))
                 case "tool_use":
                     if let id = block.id, let name = block.name {
                         let arguments: String
@@ -294,7 +335,7 @@ final class BedrockClient {
             }
         }
 
-        return AgentResponse(text: text, toolCalls: toolCalls, stopReason: response.stopReason, usage: response.usage)
+        return AgentResponse(text: text, toolCalls: toolCalls, thinkingBlocks: thinkingBlocks, stopReason: response.stopReason, usage: response.usage)
     }
 
     // MARK: - AWS Signature V4

@@ -144,15 +144,17 @@ final class AgentLoop: ObservableObject {
                 allToolCalls.append(toolCall)
             }
 
-            // Add assistant message with tool calls (no results yet)
+            // Add assistant message with tool calls and thinking blocks (no results yet)
+            // Thinking blocks MUST be preserved and passed back for reasoning continuity
             let assistantMessage = Message(
                 conversationId: messages.first?.conversationId ?? UUID(),
                 role: .assistant,
                 content: response.text,
-                toolCalls: response.toolCalls
+                toolCalls: response.toolCalls,
+                thinkingBlocks: response.thinkingBlocks.isEmpty ? nil : response.thinkingBlocks
             )
             workingMessages.append(assistantMessage)
-            Logger.shared.debug("Added assistant message with \(response.toolCalls.count) tool_use blocks")
+            Logger.shared.debug("Added assistant message with \(response.toolCalls.count) tool_use blocks and \(response.thinkingBlocks.count) thinking blocks")
 
             // Add tool results as user message
             let toolResultMessage = Message(
