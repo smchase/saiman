@@ -130,6 +130,14 @@ enum ToolChoice {
 final class BedrockClient {
     private let config = Config.shared
 
+    // Custom session with longer timeout for extended thinking
+    private lazy var session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300  // 5 minutes for thinking
+        config.timeoutIntervalForResource = 600 // 10 minutes total
+        return URLSession(configuration: config)
+    }()
+
     func sendMessage(
         messages: [Message],
         tools: [any Tool],
@@ -156,7 +164,7 @@ final class BedrockClient {
         // Sign request with AWS Signature V4
         request = try signRequest(request)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             Logger.shared.error("Invalid response from Bedrock API")

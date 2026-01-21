@@ -14,16 +14,32 @@ final class ChatViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var pendingAttachments: [PendingAttachment] = []
 
-    // Track pending message for cancel/restore
-    private var pendingMessageText: String = ""
-    private var pendingMessageId: UUID?
-    private var pendingMessageAttachments: [PendingAttachment] = []
+    // Track pending message per conversation for cancel/restore
+    private struct PendingMessage {
+        let text: String
+        let messageId: UUID
+        let attachments: [PendingAttachment]
+    }
+    private var pendingMessages: [UUID: PendingMessage] = [:]  // keyed by conversation ID
+
+    // Track which conversations have in-progress requests (for background loading)
+    private var loadingConversationIds: Set<UUID> = []
 
     // MARK: - Dependencies
 
     private let database = Database.shared
-    private let agentLoop = AgentLoop()
+    private var agentLoops: [UUID: AgentLoop] = [:]  // One loop per conversation
     private let attachmentManager = AttachmentManager.shared
+
+    /// Get or create an AgentLoop for a conversation
+    private func agentLoop(for conversationId: UUID) -> AgentLoop {
+        if let existing = agentLoops[conversationId] {
+            return existing
+        }
+        let newLoop = AgentLoop()
+        agentLoops[conversationId] = newLoop
+        return newLoop
+    }
 
     // MARK: - Computed Properties
 
@@ -48,6 +64,8 @@ final class ChatViewModel: ObservableObject {
            !conversation.isStale {
             currentConversation = conversation
             messages = database.getMessages(conversationId: conversation.id)
+            // Restore loading state if this conversation has an in-progress request
+            isLoading = loadingConversationIds.contains(conversation.id)
         } else {
             startNewConversation()
         }
@@ -69,7 +87,8 @@ final class ChatViewModel: ObservableObject {
         inputText = ""
         pendingAttachments = []
         errorMessage = nil
-        isLoading = false
+        // Restore loading state if this conversation has an in-progress request
+        isLoading = loadingConversationIds.contains(conversation.id)
         // Dismiss any pending notification for this conversation
         UNUserNotificationCenter.current().removeDeliveredNotifications(
             withIdentifiers: ["response-\(conversation.id.uuidString)"]
@@ -116,9 +135,8 @@ final class ChatViewModel: ObservableObject {
         guard !text.isEmpty || !pendingAttachments.isEmpty else { return }
         guard !isLoading else { return }
 
-        // Store for potential cancel/restore
-        pendingMessageText = text
-        pendingMessageAttachments = pendingAttachments
+        // Store attachments before clearing
+        let messageAttachments = pendingAttachments
         inputText = ""
         pendingAttachments = []
         errorMessage = nil
@@ -131,9 +149,12 @@ final class ChatViewModel: ObservableObject {
 
         guard let conversation = currentConversation else { return }
 
+        // Track that this conversation has an in-progress request
+        loadingConversationIds.insert(conversation.id)
+
         // Save attachments to disk and get Attachment objects
         var savedAttachments: [Attachment] = []
-        for pending in pendingMessageAttachments {
+        for pending in messageAttachments {
             if let saved = attachmentManager.save(pending: pending, conversationId: conversation.id) {
                 savedAttachments.append(saved)
             }
@@ -146,8 +167,14 @@ final class ChatViewModel: ObservableObject {
             content: text,
             attachments: savedAttachments.isEmpty ? nil : savedAttachments
         )
-        pendingMessageId = userMessage.id
         messages.append(userMessage)
+
+        // Store for potential cancel/restore (keyed by conversation ID)
+        pendingMessages[conversation.id] = PendingMessage(
+            text: text,
+            messageId: userMessage.id,
+            attachments: messageAttachments
+        )
 
         // Save conversation and user message immediately so they persist if popup is closed
         if database.getConversation(id: conversation.id) == nil {
@@ -155,8 +182,8 @@ final class ChatViewModel: ObservableObject {
         }
         database.createMessage(userMessage)
 
-        // Run agent
-        agentLoop.run(messages: messages) { [weak self] responseText, toolCalls in
+        // Run agent (use per-conversation loop for concurrent requests)
+        agentLoop(for: conversation.id).run(messages: messages) { [weak self] responseText, toolCalls in
             guard let self = self else { return }
 
             // Create and save assistant message to database (always, regardless of current conversation)
@@ -174,6 +201,10 @@ final class ChatViewModel: ObservableObject {
             updatedConversation.updatedAt = Date()
             self.database.updateConversation(updatedConversation)
 
+            // Request completed - remove from tracking sets
+            self.loadingConversationIds.remove(conversation.id)
+            self.pendingMessages.removeValue(forKey: conversation.id)
+
             // Check if we're still viewing the same conversation
             let isStillCurrentConversation = self.currentConversation?.id == conversation.id
 
@@ -182,14 +213,11 @@ final class ChatViewModel: ObservableObject {
                 self.messages.append(assistantMessage)
                 self.currentConversation = updatedConversation
                 self.isLoading = false
-                self.pendingMessageText = ""
-                self.pendingMessageId = nil
-                self.pendingMessageAttachments = []
             }
 
             // Update title after each exchange (DB always, UI only if still current)
             Task {
-                if let title = await self.agentLoop.generateTitle(for: self.database.getMessages(conversationId: conversation.id)) {
+                if let title = await self.agentLoop(for: conversation.id).generateTitle(for: self.database.getMessages(conversationId: conversation.id)) {
                     var conv = updatedConversation
                     conv.title = title
                     self.database.updateConversation(conv)
@@ -214,16 +242,21 @@ final class ChatViewModel: ObservableObject {
     }
 
     func cancelRequest() {
-        agentLoop.cancel()
-        isLoading = false
+        guard let conversation = currentConversation else { return }
 
-        // Restore the user's message text and attachments for editing
-        inputText = pendingMessageText
+        agentLoop(for: conversation.id).cancel()
+        isLoading = false
+        loadingConversationIds.remove(conversation.id)
+
+        // Get pending message for THIS conversation
+        guard let pending = pendingMessages[conversation.id] else { return }
+
+        // Restore the user's message text
+        inputText = pending.text
 
         // Restore attachments - but we need to recreate PendingAttachments
         // from the saved files if they were already saved
-        if let messageId = pendingMessageId,
-           let message = messages.first(where: { $0.id == messageId }),
+        if let message = messages.first(where: { $0.id == pending.messageId }),
            let attachments = message.attachments {
             // Reload as pending attachments for editing
             pendingAttachments = attachments.compactMap { attachment in
@@ -238,24 +271,22 @@ final class ChatViewModel: ObservableObject {
             }
         } else {
             // Restore from in-memory pending attachments
-            pendingAttachments = pendingMessageAttachments
+            pendingAttachments = pending.attachments
         }
 
         // Remove the pending user message from UI and database
-        if let messageId = pendingMessageId {
-            messages.removeAll { $0.id == messageId }
-            database.deleteMessage(id: messageId)
-        }
+        messages.removeAll { $0.id == pending.messageId }
+        database.deleteMessage(id: pending.messageId)
+
+        // Clear pending message for this conversation
+        pendingMessages.removeValue(forKey: conversation.id)
 
         // If this was a new conversation with no completed messages, delete it
-        if messages.isEmpty, let conversation = currentConversation {
+        if messages.isEmpty {
+            agentLoops.removeValue(forKey: conversation.id)
             database.deleteConversation(id: conversation.id)
             currentConversation = nil
         }
-
-        pendingMessageText = ""
-        pendingMessageId = nil
-        pendingMessageAttachments = []
     }
 
     // MARK: - Search
@@ -272,6 +303,12 @@ final class ChatViewModel: ObservableObject {
     }
 
     func deleteConversation(_ conversation: Conversation) {
+        // Cancel any in-progress request and clean up
+        agentLoops[conversation.id]?.cancel()
+        agentLoops.removeValue(forKey: conversation.id)
+        loadingConversationIds.remove(conversation.id)
+        pendingMessages.removeValue(forKey: conversation.id)
+
         // Delete attachment files too
         attachmentManager.deleteAll(for: conversation.id)
 

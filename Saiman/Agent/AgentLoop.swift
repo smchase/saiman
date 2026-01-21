@@ -89,7 +89,14 @@ final class AgentLoop: ObservableObject {
                 // URLSession was cancelled - exit silently
                 state = .cancelled
                 return
+            } catch let error as NSError where error.domain == NSURLErrorDomain && error.code == NSURLErrorTimedOut {
+                // Request timed out - likely due to extended thinking on complex query
+                Logger.shared.error("Request timed out after 300 seconds")
+                state = .error(error)
+                onComplete("The request timed out. This can happen with complex reasoning tasks. Try simplifying the question or starting a new conversation.", allToolCalls)
+                return
             } catch {
+                Logger.shared.error("API error: \(error.localizedDescription)")
                 state = .error(error)
                 onComplete("Error: \(error.localizedDescription)", allToolCalls)
                 return
