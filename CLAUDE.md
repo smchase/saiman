@@ -10,9 +10,12 @@ macOS desktop AI chat app with a Spotlight-style floating window.
 
 ## Build & Run
 
+Always use the release script to build and test:
 ```bash
-xcodebuild -scheme Saiman -configuration Debug build
+./release.sh
 ```
+
+Do not run manual `xcodebuild` commands for testing. The release script handles everything (quit, build, install, relaunch) and uses fast incremental builds.
 
 ## Environment
 
@@ -32,15 +35,7 @@ tail -100 ~/.saiman/logs/saiman-$(date +%Y-%m-%d).log
 
 Logs include API requests/responses, tool calls, and errors. Use `Logger.shared.debug/info/error()` to add logs.
 
-## Releasing a New Version
-
-After making code changes, run the release script:
-
-```bash
-./release.sh
-```
-
-This quits the running app, builds a release version, installs to /Applications, and relaunches. Uses incremental builds for speed.
+## Troubleshooting
 
 **Build issues?** If you encounter strange behavior after renaming/deleting files, stale build artifacts may be the cause. Run a clean build:
 ```bash
