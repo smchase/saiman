@@ -40,7 +40,12 @@ After making code changes, run the release script:
 ./release.sh
 ```
 
-This quits the running app, builds a release version, installs to /Applications, and relaunches.
+This quits the running app, builds a release version, installs to /Applications, and relaunches. Uses incremental builds for speed.
+
+**Build issues?** If you encounter strange behavior after renaming/deleting files, stale build artifacts may be the cause. Run a clean build:
+```bash
+xcodebuild -scheme Saiman -configuration Release clean build
+```
 
 **Login Item**: Saiman is set to auto-start on login. If this gets removed, re-add it with:
 ```bash
