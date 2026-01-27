@@ -138,7 +138,7 @@ final class Config {
     }
 
     var maxToolCalls: Int {
-        10
+        20
     }
 
     // MARK: - System Prompt
