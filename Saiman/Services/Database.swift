@@ -91,6 +91,9 @@ final class Database {
 
         // Migration: add attachments column if it doesn't exist
         migrateAddAttachmentsColumn()
+
+        // Migration: add tool_usage_summary column if it doesn't exist
+        migrateAddToolUsageSummaryColumn()
     }
 
     private func migrateAddAttachmentsColumn() {
@@ -102,6 +105,19 @@ final class Database {
             // Column doesn't exist, add it
             execute("ALTER TABLE messages ADD COLUMN attachments TEXT;")
             Logger.shared.info("Database migrated: added attachments column")
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    private func migrateAddToolUsageSummaryColumn() {
+        // Check if column exists by trying to query it
+        let checkSql = "SELECT tool_usage_summary FROM messages LIMIT 1;"
+        var stmt: OpaquePointer?
+
+        if sqlite3_prepare_v2(db, checkSql, -1, &stmt, nil) != SQLITE_OK {
+            // Column doesn't exist, add it
+            execute("ALTER TABLE messages ADD COLUMN tool_usage_summary TEXT;")
+            Logger.shared.info("Database migrated: added tool_usage_summary column")
         }
         sqlite3_finalize(stmt)
     }
@@ -278,7 +294,7 @@ final class Database {
 
     func createMessage(_ message: Message) {
         queue.sync {
-            let sql = "INSERT INTO messages (id, conversation_id, role, content, tool_calls, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?);"
+            let sql = "INSERT INTO messages (id, conversation_id, role, content, tool_calls, attachments, tool_usage_summary, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?);"
             var stmt: OpaquePointer?
 
             if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
@@ -303,7 +319,13 @@ final class Database {
                     sqlite3_bind_null(stmt, 6)
                 }
 
-                sqlite3_bind_double(stmt, 7, message.createdAt.timeIntervalSince1970)
+                if let summary = message.toolUsageSummary {
+                    sqlite3_bind_text(stmt, 7, summary, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                } else {
+                    sqlite3_bind_null(stmt, 7)
+                }
+
+                sqlite3_bind_double(stmt, 8, message.createdAt.timeIntervalSince1970)
                 sqlite3_step(stmt)
             }
             sqlite3_finalize(stmt)
@@ -312,7 +334,7 @@ final class Database {
 
     func getMessages(conversationId: UUID) -> [Message] {
         queue.sync {
-            let sql = "SELECT id, conversation_id, role, content, tool_calls, attachments, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC;"
+            let sql = "SELECT id, conversation_id, role, content, tool_calls, attachments, tool_usage_summary, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC;"
             var stmt: OpaquePointer?
             var messages: [Message] = []
 
@@ -332,7 +354,7 @@ final class Database {
 
     func getLastMessage(conversationId: UUID) -> Message? {
         queue.sync {
-            let sql = "SELECT id, conversation_id, role, content, tool_calls, attachments, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1;"
+            let sql = "SELECT id, conversation_id, role, content, tool_calls, attachments, tool_usage_summary, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1;"
             var stmt: OpaquePointer?
             var message: Message?
 
@@ -371,6 +393,11 @@ final class Database {
             attachments = try? JSONDecoder().decode([Attachment].self, from: attachmentsData)
         }
 
+        var toolUsageSummary: String?
+        if let summaryStr = sqlite3_column_text(stmt, 6) {
+            toolUsageSummary = String(cString: summaryStr)
+        }
+
         return Message(
             id: id,
             conversationId: convId,
@@ -378,7 +405,8 @@ final class Database {
             content: String(cString: contentStr),
             toolCalls: toolCalls,
             attachments: attachments,
-            createdAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 6))
+            toolUsageSummary: toolUsageSummary,
+            createdAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 7))
         )
     }
 }

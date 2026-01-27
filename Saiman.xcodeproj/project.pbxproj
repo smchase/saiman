@@ -55,6 +55,12 @@
 		B1000025 /* AttachmentManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000025; };
 		B1000029 /* GetPageContentsTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000029; };
 		B1000028 /* TokenTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000028; };
+		A1000031 /* RedditSearchTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000031; };
+		A1000032 /* RedditReadTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000032; };
+		A1000033 /* RedditClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000033; };
+		B1000031 /* RedditSearchTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000031; };
+		B1000032 /* RedditReadTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000032; };
+		B1000033 /* RedditClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000033; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -92,6 +98,9 @@
 		B2000002 /* Evals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Evals.swift; sourceTree = "<group>"; };
 		B3000001 /* SaimanTests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SaimanTests; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2000030 /* ContentParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentParser.swift; sourceTree = "<group>"; };
+		A2000031 /* RedditSearchTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedditSearchTool.swift; sourceTree = "<group>"; };
+		A2000032 /* RedditReadTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedditReadTool.swift; sourceTree = "<group>"; };
+		A2000033 /* RedditClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedditClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -172,6 +181,8 @@
 				A2000008 /* Tool.swift */,
 				A2000009 /* WebSearchTool.swift */,
 				A2000029 /* GetPageContentsTool.swift */,
+				A2000031 /* RedditSearchTool.swift */,
+				A2000032 /* RedditReadTool.swift */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -184,6 +195,7 @@
 				A2000012 /* Database.swift */,
 				A2000025 /* AttachmentManager.swift */,
 				A2000028 /* TokenTracker.swift */,
+				A2000033 /* RedditClient.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -358,6 +370,9 @@
 				A1000028 /* TokenTracker.swift in Sources */,
 				A1000029 /* GetPageContentsTool.swift in Sources */,
 				A1000030 /* ContentParser.swift in Sources */,
+				A1000031 /* RedditSearchTool.swift in Sources */,
+				A1000032 /* RedditReadTool.swift in Sources */,
+				A1000033 /* RedditClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -381,6 +396,9 @@
 				B1000025 /* AttachmentManager.swift in Sources */,
 				B1000029 /* GetPageContentsTool.swift in Sources */,
 				B1000028 /* TokenTracker.swift in Sources */,
+				B1000031 /* RedditSearchTool.swift in Sources */,
+				B1000032 /* RedditReadTool.swift in Sources */,
+				B1000033 /* RedditClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

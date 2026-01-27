@@ -20,7 +20,14 @@ struct MessageBubble: View {
             userMessageContent
 
         case .assistant:
-            MarkdownView(text: message.content)
+            // Append tool usage summary to content before rendering (single Markdown pass)
+            let displayContent: String = {
+                if let summary = message.toolUsageSummary {
+                    return message.content + "\n\n---\n\n`\(summary)`"
+                }
+                return message.content
+            }()
+            MarkdownView(text: displayContent)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
         case .system:

@@ -112,6 +112,8 @@ final class ToolRegistry {
         // Register default tools
         register(WebSearchTool())
         register(GetPageContentsTool())
+        register(RedditSearchTool())
+        register(RedditReadTool())
     }
 
     func register(_ tool: any Tool) {

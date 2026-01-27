@@ -22,6 +22,7 @@ struct Message: Identifiable, Codable {
     var toolCalls: [ToolCall]?
     var attachments: [Attachment]?
     var thinkingBlocks: [ThinkingBlock]?
+    var toolUsageSummary: String?  // Display-only, not sent to API
     let createdAt: Date
 
     init(
@@ -32,6 +33,7 @@ struct Message: Identifiable, Codable {
         toolCalls: [ToolCall]? = nil,
         attachments: [Attachment]? = nil,
         thinkingBlocks: [ThinkingBlock]? = nil,
+        toolUsageSummary: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -41,6 +43,7 @@ struct Message: Identifiable, Codable {
         self.toolCalls = toolCalls
         self.attachments = attachments
         self.thinkingBlocks = thinkingBlocks
+        self.toolUsageSummary = toolUsageSummary
         self.createdAt = createdAt
     }
 }
@@ -142,5 +145,77 @@ extension Message {
         }
 
         return dict
+    }
+}
+
+// MARK: - Tool Usage Summary
+
+extension Message {
+    /// Generate a tool usage summary from an array of tool calls.
+    /// Returns nil if no tools were used.
+    /// Format: "🛠️ 2 web searches · 1 page read · 3 Reddit searches · 2 Reddit threads read"
+    static func generateToolUsageSummary(from toolCalls: [ToolCall]) -> String? {
+        guard !toolCalls.isEmpty else { return nil }
+
+        // Count tool usage (order: most general to least general)
+        // For tools that batch URLs, count the actual number of items
+        var webSearches = 0
+        var pagesRead = 0
+        var redditSearches = 0
+        var redditThreadsRead = 0
+
+        for call in toolCalls {
+            switch call.name {
+            case "web_search":
+                webSearches += 1
+            case "get_page_contents":
+                // Count actual URLs in the batch
+                pagesRead += countUrlsInArguments(call.arguments)
+            case "reddit_search":
+                redditSearches += 1
+            case "reddit_read":
+                // Count actual URLs in the batch
+                redditThreadsRead += countUrlsInArguments(call.arguments)
+            default:
+                break
+            }
+        }
+
+        // Build summary parts (only non-zero counts)
+        var parts: [String] = []
+
+        if webSearches > 0 {
+            parts.append(webSearches == 1 ? "1 web search" : "\(webSearches) web searches")
+        }
+        if pagesRead > 0 {
+            parts.append(pagesRead == 1 ? "1 page read" : "\(pagesRead) pages read")
+        }
+        if redditSearches > 0 {
+            parts.append(redditSearches == 1 ? "1 Reddit search" : "\(redditSearches) Reddit searches")
+        }
+        if redditThreadsRead > 0 {
+            parts.append(redditThreadsRead == 1 ? "1 Reddit thread read" : "\(redditThreadsRead) Reddit threads read")
+        }
+
+        guard !parts.isEmpty else { return nil }
+
+        return "🛠️ " + parts.joined(separator: " · ")
+    }
+
+    /// Count the number of URLs in a tool call's arguments.
+    /// Handles both single URL strings and arrays of URLs.
+    private static func countUrlsInArguments(_ arguments: String) -> Int {
+        guard let data = arguments.data(using: .utf8),
+              let args = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return 1  // Fallback to 1 if parsing fails
+        }
+
+        if let urlArray = args["urls"] as? [String] {
+            return urlArray.count
+        } else if args["urls"] is String {
+            return 1
+        }
+
+        return 1  // Fallback
     }
 }

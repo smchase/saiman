@@ -6,18 +6,16 @@ final class WebSearchTool: Tool {
     let name = "web_search"
 
     let description = """
-        Search the web using Exa's neural search. Returns raw page content for you to synthesize.
+        Search the web for current information. Reddit is excluded from results - use reddit_search for Reddit.
 
         When to use:
-        - Information likely outdated or changed since August 2025
-        - Facts you're uncertain about (dates, statistics, current status)
-        - Current events, news, prices, recent developments
-        - Technical docs, APIs, or specs that update frequently
+        - Information that may have changed since your knowledge cutoff
+        - Current events, news, prices, stock quotes
+        - Technical docs, APIs, specs that update frequently
 
         When NOT to use:
-        - You confidently know the answer
-        - Reasoning, analysis, math, or creative tasks
-        - Well-established facts within your training data
+        - You confidently know the answer from training
+        - Reasoning, math, or creative tasks
         """
 
     let parameters: [ToolParameter] = [

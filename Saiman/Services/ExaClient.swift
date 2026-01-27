@@ -20,12 +20,14 @@ struct ExaSearchRequest: Encodable {
     let query: String
     let type: String
     let numResults: Int
-    let contents: ExaContentsOptions
+    let contents: ExaContentsOptions?
     let livecrawl: String?
+    let includeDomains: [String]?
 
     enum CodingKeys: String, CodingKey {
         case query, type, contents, livecrawl
         case numResults = "num_results"
+        case includeDomains = "include_domains"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -33,8 +35,9 @@ struct ExaSearchRequest: Encodable {
         try container.encode(query, forKey: .query)
         try container.encode(type, forKey: .type)
         try container.encode(numResults, forKey: .numResults)
-        try container.encode(contents, forKey: .contents)
+        try container.encodeIfPresent(contents, forKey: .contents)
         try container.encodeIfPresent(livecrawl, forKey: .livecrawl)
+        try container.encodeIfPresent(includeDomains, forKey: .includeDomains)
     }
 }
 
@@ -87,15 +90,17 @@ final class ExaClient {
     /// - Parameters:
     ///   - query: The search query
     ///   - numResults: Number of results (1-50, default 5)
-    ///   - maxCharacters: Max characters per result (default 2000)
+    ///   - maxCharacters: Max characters per result (default 2000). Set to nil to skip content fetching.
     ///   - searchType: Search type - fast, auto, or deep (default auto)
     ///   - livecrawl: Livecrawl mode - fallback, preferred, or always (default fallback)
+    ///   - includeDomains: Limit search to specific domains (e.g., ["reddit.com"])
     func search(
         query: String,
         numResults: Int = 5,
-        maxCharacters: Int = 2000,
+        maxCharacters: Int? = 2000,
         searchType: SearchType = .auto,
-        livecrawl: LivecrawlMode = .fallback
+        livecrawl: LivecrawlMode = .fallback,
+        includeDomains: [String]? = nil
     ) async throws -> [ExaResult] {
         let url = URL(string: "\(baseURL)/search")!
 
@@ -108,27 +113,49 @@ final class ExaClient {
             query: query,
             type: searchType.rawValue,
             numResults: numResults,
-            contents: ExaContentsOptions(
-                text: ExaTextOptions(maxCharacters: maxCharacters)
-            ),
-            livecrawl: livecrawl.rawValue
+            contents: maxCharacters.map { ExaContentsOptions(text: ExaTextOptions(maxCharacters: $0)) },
+            livecrawl: livecrawl.rawValue,
+            includeDomains: includeDomains
         )
 
         request.httpBody = try JSONEncoder().encode(searchRequest)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError {
+            Logger.shared.error("Exa: Network error during search: \(error.localizedDescription)")
+            throw ExaError.networkError(error.localizedDescription)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            Logger.shared.error("Exa: Invalid response type during search")
             throw ExaError.invalidResponse
         }
 
-        if httpResponse.statusCode != 200 {
+        switch httpResponse.statusCode {
+        case 200:
+            break
+        case 401:
+            Logger.shared.error("Exa: Authentication error (401)")
+            throw ExaError.authenticationError
+        case 429:
+            Logger.shared.error("Exa: Rate limited (429)")
+            throw ExaError.rateLimited
+        default:
             let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+            Logger.shared.error("Exa: API error (\(httpResponse.statusCode)): \(errorBody.prefix(200))")
             throw ExaError.apiError(statusCode: httpResponse.statusCode, message: errorBody)
         }
 
-        let searchResponse = try JSONDecoder().decode(ExaSearchResponse.self, from: data)
-        return searchResponse.results
+        do {
+            let searchResponse = try JSONDecoder().decode(ExaSearchResponse.self, from: data)
+            return searchResponse.results
+        } catch {
+            Logger.shared.error("Exa: Failed to decode search response: \(error.localizedDescription)")
+            throw ExaError.apiError(statusCode: 200, message: "Failed to parse response")
+        }
     }
 
     /// Fetch contents from specific URLs
@@ -156,19 +183,42 @@ final class ExaClient {
 
         request.httpBody = try JSONEncoder().encode(contentsRequest)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError {
+            Logger.shared.error("Exa: Network error during getContents: \(error.localizedDescription)")
+            throw ExaError.networkError(error.localizedDescription)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            Logger.shared.error("Exa: Invalid response type during getContents")
             throw ExaError.invalidResponse
         }
 
-        if httpResponse.statusCode != 200 {
+        switch httpResponse.statusCode {
+        case 200:
+            break
+        case 401:
+            Logger.shared.error("Exa: Authentication error (401)")
+            throw ExaError.authenticationError
+        case 429:
+            Logger.shared.error("Exa: Rate limited (429)")
+            throw ExaError.rateLimited
+        default:
             let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+            Logger.shared.error("Exa: API error (\(httpResponse.statusCode)) during getContents: \(errorBody.prefix(200))")
             throw ExaError.apiError(statusCode: httpResponse.statusCode, message: errorBody)
         }
 
-        let contentsResponse = try JSONDecoder().decode(ExaContentsResponse.self, from: data)
-        return contentsResponse.results
+        do {
+            let contentsResponse = try JSONDecoder().decode(ExaContentsResponse.self, from: data)
+            return contentsResponse.results
+        } catch {
+            Logger.shared.error("Exa: Failed to decode contents response: \(error.localizedDescription)")
+            throw ExaError.apiError(statusCode: 200, message: "Failed to parse response")
+        }
     }
 }
 
@@ -176,14 +226,23 @@ final class ExaClient {
 
 enum ExaError: Error, LocalizedError {
     case invalidResponse
+    case rateLimited
+    case authenticationError
     case apiError(statusCode: Int, message: String)
+    case networkError(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidResponse:
-            return "Invalid response from Exa API"
+            return "Invalid response from Exa API."
+        case .rateLimited:
+            return "Exa API rate limit exceeded. Wait a moment before retrying, or reduce the number of results requested."
+        case .authenticationError:
+            return "Exa API authentication failed. Check the API key configuration."
         case .apiError(let statusCode, let message):
-            return "Exa API error (\(statusCode)): \(message)"
+            return "Exa API error (HTTP \(statusCode)): \(message)"
+        case .networkError(let message):
+            return "Network error connecting to Exa: \(message)"
         }
     }
 }

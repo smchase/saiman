@@ -186,13 +186,17 @@ final class ChatViewModel: ObservableObject {
         agentLoop(for: conversation.id).run(messages: messages) { [weak self] responseText, toolCalls in
             guard let self = self else { return }
 
+            // Generate tool usage summary (if any tools were used)
+            let toolUsageSummary = Message.generateToolUsageSummary(from: toolCalls)
+
             // Create and save assistant message to database (always, regardless of current conversation)
             // Note: We don't save toolCalls - they're transient to this turn and not displayed.
             // The model can re-invoke tools if needed when continuing the conversation.
             let assistantMessage = Message(
                 conversationId: conversation.id,
                 role: .assistant,
-                content: responseText
+                content: responseText,
+                toolUsageSummary: toolUsageSummary
             )
             self.database.createMessage(assistantMessage)
 

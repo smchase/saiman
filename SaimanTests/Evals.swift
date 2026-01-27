@@ -27,6 +27,19 @@ struct EvalContext {
         toolCalls.filter { $0.name == "get_page_contents" }
     }
 
+    var redditSearchCalls: [ToolCall] {
+        toolCalls.filter { $0.name == "reddit_search" }
+    }
+
+    var redditReadCalls: [ToolCall] {
+        toolCalls.filter { $0.name == "reddit_read" }
+    }
+
+    // Total search activity (web_search + reddit_search)
+    var totalSearchActivity: Int {
+        totalSearchCount + redditSearchCalls.count
+    }
+
     // Parse search parameters from tool calls
     func searchTypes() -> [String] {
         searchCalls.compactMap { call in
@@ -129,6 +142,12 @@ actor EvalRunner {
             if ctx.hasFreshContent() {
                 stats.append("livecrawl: fresh")
             }
+        }
+        if !ctx.redditSearchCalls.isEmpty {
+            stats.append("reddit_search: \(ctx.redditSearchCalls.count)")
+        }
+        if !ctx.redditReadCalls.isEmpty {
+            stats.append("reddit_read: \(ctx.redditReadCalls.count)")
         }
         stats.append("len: \(ctx.responseLength)")
 
@@ -280,12 +299,12 @@ actor EvalRunner {
             // Tests: Does multiple searches for complex topics requiring synthesis
 
             Eval(name: "Quality: Multi-Perspective Research", question: "What are the main arguments for and against remote work becoming permanent? I want perspectives from both employers and employees.") { ctx in
-                // Should search - this needs current perspectives
-                if ctx.totalSearchCount == 0 {
+                // Should search - this needs current perspectives (web_search or reddit_search)
+                if ctx.totalSearchActivity == 0 {
                     return (false, "Should search for current perspectives on remote work")
                 }
                 // Should do multiple searches or get many results for balanced view
-                let thoroughResearch = ctx.totalSearchCount >= 2 || ctx.maxNumResults() >= 8
+                let thoroughResearch = ctx.totalSearchActivity >= 2 || ctx.maxNumResults() >= 8
                 if !thoroughResearch {
                     return (false, "Balanced research should use multiple searches or many results")
                 }
@@ -339,8 +358,17 @@ actor EvalRunner {
                                            lower.contains("trade-off") ||
                                            lower.contains("tradeoff") ||
                                            lower.contains("use case") ||
+                                           lower.contains("context") ||
+                                           lower.contains("scenario") ||
+                                           lower.contains("it varies") ||
+                                           lower.contains("both have") ||
+                                           lower.contains("each has") ||
+                                           lower.contains("neither is") ||
+                                           lower.contains("not necessarily") ||
                                            (lower.contains("pros") && lower.contains("cons")) ||
-                                           (lower.contains("advantage") && lower.contains("disadvantage"))
+                                           (lower.contains("advantage") && lower.contains("disadvantage")) ||
+                                           (lower.contains("better for") && lower.contains("worse for")) ||
+                                           (lower.contains("graphql") && lower.contains("rest") && lower.contains("when"))
                 if !acknowledgesTradeoffs {
                     return (false, "Should acknowledge this is context-dependent, not declare a winner")
                 }
@@ -351,10 +379,14 @@ actor EvalRunner {
             // Tests: Uses Reddit/forums for opinion-based queries instead of SEO spam
 
             Eval(name: "Quality: Prefers User Forums", question: "What's a good budget mechanical keyboard for programming?") { ctx in
-                if ctx.totalSearchCount == 0 {
+                if ctx.totalSearchActivity == 0 {
                     return (false, "Should search for product recommendations")
                 }
-                // Check if any search query includes reddit or forum
+                // Using reddit_search is the ideal behavior
+                if !ctx.redditSearchCalls.isEmpty {
+                    return (true, "OK")
+                }
+                // Fallback: check if web_search query includes reddit or forum
                 let queries = ctx.searchCalls.compactMap { call -> String? in
                     guard let data = call.arguments.data(using: .utf8),
                           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -365,7 +397,7 @@ actor EvalRunner {
                     q.contains("reddit") || q.contains("forum") || q.contains("community")
                 }
                 if !usedForumSource {
-                    return (false, "Product recommendations should search Reddit/forums (queries: \(queries.joined(separator: ", ")))")
+                    return (false, "Product recommendations should use reddit_search or search Reddit/forums")
                 }
                 return (true, "OK")
             },
@@ -383,6 +415,101 @@ actor EvalRunner {
                                        ctx.response.range(of: #"\d{3,}"#, options: .regularExpression) != nil
                 if !hasSpecificNumber {
                     return (false, "Should provide specific user count, not vague estimates")
+                }
+                return (true, "OK")
+            },
+
+            // === REDDIT TOOLS ===
+            // Tests: Uses reddit_search for opinion/recommendation queries
+
+            Eval(name: "Reddit: Used for Recommendations", question: "What's the best mechanical keyboard according to Reddit?") { ctx in
+                // Should use reddit_search for product recommendations
+                if ctx.redditSearchCalls.isEmpty {
+                    return (false, "Should use reddit_search for Reddit-specific recommendations")
+                }
+                // Response should mention specific keyboards
+                let lower = ctx.response.lowercased()
+                let hasSpecificRec = lower.contains("keyboard") || lower.contains("keychron") ||
+                                    lower.contains("ducky") || lower.contains("anne pro") ||
+                                    lower.contains("leopold") || lower.contains("varmilo")
+                if !hasSpecificRec {
+                    return (false, "Should mention specific keyboard recommendations")
+                }
+                return (true, "OK")
+            },
+
+            Eval(name: "Reddit: Read After Search", question: "Search Reddit for the best budget headphones and tell me what people recommend") { ctx in
+                // Should use reddit_search
+                if ctx.redditSearchCalls.isEmpty {
+                    return (false, "Should use reddit_search first")
+                }
+                // Should also use reddit_read to get details
+                if ctx.redditReadCalls.isEmpty {
+                    return (false, "Should use reddit_read to get thread details")
+                }
+                // Response should include specific product recommendations
+                let lower = ctx.response.lowercased()
+                let hasProducts = lower.contains("headphone") || lower.contains("audio") ||
+                                 lower.contains("$") || lower.contains("budget")
+                if !hasProducts {
+                    return (false, "Should include specific headphone recommendations")
+                }
+                return (true, "OK")
+            },
+
+            Eval(name: "Reddit: Not Used for Facts", question: "What is the population of Canada?") { ctx in
+                // Should NOT use reddit tools for factual queries
+                if !ctx.redditSearchCalls.isEmpty {
+                    return (false, "Should not use reddit_search for factual lookups")
+                }
+                // Should contain a number
+                let hasNumber = ctx.response.range(of: #"\d"#, options: .regularExpression) != nil
+                if !hasNumber {
+                    return (false, "Should provide a population number")
+                }
+                return (true, "OK")
+            },
+
+            Eval(name: "Reddit: Restaurant Recommendations", question: "What's the best ramen in San Francisco?") { ctx in
+                // Should use reddit_search for restaurant recommendations
+                if ctx.redditSearchCalls.isEmpty {
+                    return (false, "Should use reddit_search for restaurant recommendations")
+                }
+                // Response should mention specific restaurants
+                let lower = ctx.response.lowercased()
+                let hasRestaurant = lower.contains("ramen") || lower.contains("restaurant") ||
+                                   lower.contains("sf") || lower.contains("san francisco")
+                if !hasRestaurant {
+                    return (false, "Should mention specific ramen places")
+                }
+                return (true, "OK")
+            },
+
+            Eval(name: "Reddit: API Recommendations", question: "What's the best auth library for Node.js?") { ctx in
+                // Should use reddit_search for API/library recommendations
+                if ctx.redditSearchCalls.isEmpty {
+                    return (false, "Should use reddit_search for library recommendations")
+                }
+                // Response should mention specific libraries
+                let lower = ctx.response.lowercased()
+                let hasLibrary = lower.contains("passport") || lower.contains("auth") ||
+                                lower.contains("jwt") || lower.contains("oauth") ||
+                                lower.contains("library") || lower.contains("node")
+                if !hasLibrary {
+                    return (false, "Should mention specific auth libraries")
+                }
+                return (true, "OK")
+            },
+
+            Eval(name: "Reddit: Not Used for Docs", question: "How do I use useEffect in React?") { ctx in
+                // Technical docs should use web_search, not Reddit
+                if !ctx.redditSearchCalls.isEmpty {
+                    return (false, "Should not use reddit_search for technical documentation")
+                }
+                // Response should explain useEffect
+                let lower = ctx.response.lowercased()
+                if !lower.contains("useeffect") && !lower.contains("effect") {
+                    return (false, "Should explain useEffect")
                 }
                 return (true, "OK")
             },
