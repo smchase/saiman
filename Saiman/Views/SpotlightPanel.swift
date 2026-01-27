@@ -44,17 +44,21 @@ final class SpotlightPanel: NSPanel {
     private func restorePosition() {
         if UserDefaults.standard.bool(forKey: Self.hasCustomPositionKey) {
             let x = UserDefaults.standard.double(forKey: Self.positionXKey)
-            let y = UserDefaults.standard.double(forKey: Self.positionYKey)
-            setFrameOrigin(NSPoint(x: x, y: y))
+            let topY = UserDefaults.standard.double(forKey: Self.positionYKey)
+            // Convert top-left to bottom-left origin
+            let originY = topY - frame.height
+            setFrameOrigin(NSPoint(x: x, y: originY))
         } else {
             centerOnScreen()
         }
     }
 
     private func savePosition() {
-        let origin = frame.origin
-        UserDefaults.standard.set(origin.x, forKey: Self.positionXKey)
-        UserDefaults.standard.set(origin.y, forKey: Self.positionYKey)
+        // Save top-left corner (not bottom-left origin) so position is
+        // consistent regardless of window height changes
+        let topLeft = NSPoint(x: frame.origin.x, y: frame.origin.y + frame.height)
+        UserDefaults.standard.set(topLeft.x, forKey: Self.positionXKey)
+        UserDefaults.standard.set(topLeft.y, forKey: Self.positionYKey)
         UserDefaults.standard.set(true, forKey: Self.hasCustomPositionKey)
     }
 
