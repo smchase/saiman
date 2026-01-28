@@ -162,8 +162,6 @@ final class SpotlightPanelController: ObservableObject {
 
             // Cmd+N for new conversation
             if event.modifierFlags.contains(.command) && event.keyCode == 45 {
-                // Save current state before clearing (preserves work if user changes mind)
-                self.saveSessionSnapshot()
                 self.viewModel.startNewConversation()
                 return nil
             }
@@ -190,18 +188,8 @@ final class SpotlightPanelController: ObservableObject {
 
     // MARK: - Session Snapshot Management
 
-    /// Saves the current state as a snapshot, unless it's an empty new conversation.
-    /// Empty new conversations don't overwrite meaningful snapshots.
+    /// Saves the current state as a snapshot for restoration when the panel reopens.
     private func saveSessionSnapshot() {
-        let inputText = viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hasContent = !inputText.isEmpty || !viewModel.pendingAttachments.isEmpty
-        let hasMessages = !viewModel.messages.isEmpty
-        let isExistingConversation = viewModel.currentConversation != nil
-
-        // Don't save empty new conversations - they're not meaningful state
-        let isEmptyNew = !isExistingConversation && !hasContent && !hasMessages
-        guard !isEmptyNew else { return }
-
         sessionSnapshot = SessionSnapshot(
             conversationId: viewModel.currentConversation?.id,
             inputText: viewModel.inputText,
