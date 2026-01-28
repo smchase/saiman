@@ -1,0 +1,3 @@
+[submodule "Packages/swift-markdown-ui"]
+	path = Packages/swift-markdown-ui
+	url = git@github.com:smchase/swift-markdown-ui.git

@@ -199,7 +199,7 @@ extension Message {
 
         guard !parts.isEmpty else { return nil }
 
-        return "🛠️ " + parts.joined(separator: " · ")
+        return "🛠️ " + parts.joined(separator: ", ")
     }
 
     /// Count the number of URLs in a tool call's arguments.

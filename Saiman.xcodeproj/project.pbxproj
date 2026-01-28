@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		C1000001 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = C2000001 /* MarkdownUI */; };
-		C1000002 /* LaTeXSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = C2000002 /* LaTeXSwiftUI */; };
 		A1000030 /* ContentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000030; };
 		A1000001 /* SaimanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001; };
 		A1000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002; };
@@ -109,7 +108,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				C1000001 /* MarkdownUI in Frameworks */,
-				C1000002 /* LaTeXSwiftUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -264,7 +262,6 @@
 			name = Saiman;
 			packageProductDependencies = (
 				C2000001 /* MarkdownUI */,
-				C2000002 /* LaTeXSwiftUI */,
 			);
 			productName = Saiman;
 			productReference = A3000001 /* Saiman.app */;
@@ -314,8 +311,7 @@
 			);
 			mainGroup = A5000001;
 			packageReferences = (
-				C3000001 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
-				C3000002 /* XCRemoteSwiftPackageReference "LaTeXSwiftUI" */,
+				C3000001 /* XCLocalSwiftPackageReference "swift-markdown-ui" */,
 			);
 			productRefGroup = A5000008 /* Products */;
 			projectDirPath = "";
@@ -634,21 +630,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		C3000001 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.0.0;
-			};
-		};
-		C3000002 /* XCRemoteSwiftPackageReference "LaTeXSwiftUI" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/colinc86/LaTeXSwiftUI";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
-			};
+		C3000001 /* XCLocalSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "Packages/swift-markdown-ui";
 		};
 /* End XCRemoteSwiftPackageReference section */
 
@@ -657,11 +641,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C3000001 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
 			productName = MarkdownUI;
-		};
-		C2000002 /* LaTeXSwiftUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C3000002 /* XCRemoteSwiftPackageReference "LaTeXSwiftUI" */;
-			productName = LaTeXSwiftUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
