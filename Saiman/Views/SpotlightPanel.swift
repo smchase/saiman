@@ -323,6 +323,7 @@ final class SpotlightPanelController: ObservableObject {
 
 struct SpotlightContentView: View {
     @ObservedObject var viewModel: ChatViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 0) {
@@ -334,7 +335,9 @@ struct SpotlightContentView: View {
         .background(
             ZStack {
                 VisualEffectView(material: .popover, blendingMode: .behindWindow)
-                Color.white.opacity(0.5)
+                if colorScheme == .light {
+                    Color.white.opacity(0.5)
+                }
             }
         )
         .clipShape(RoundedRectangle(cornerRadius: 18))
