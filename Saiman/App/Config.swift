@@ -113,7 +113,7 @@ final class Config {
 
     var bedrockModelId: String {
         ProcessInfo.processInfo.environment["SAIMAN_BEDROCK_MODEL"]
-            ?? "us.anthropic.claude-opus-4-5-20251101-v1:0"
+            ?? "us.anthropic.claude-opus-4-6-v1"
     }
 
     var bedrockHaikuModelId: String {
