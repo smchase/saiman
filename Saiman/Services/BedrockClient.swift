@@ -199,10 +199,12 @@ final class BedrockClient {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 21333,
             "system": config.systemPrompt,
-            // Extended thinking configuration
+            // Adaptive thinking: model decides when and how much to think
             "thinking": [
-                "type": "enabled",
-                "budget_tokens": 16000
+                "type": "adaptive"
+            ],
+            "output_config": [
+                "effort": "high"
             ]
         ]
 
