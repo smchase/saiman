@@ -153,7 +153,7 @@ final class BedrockClient {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         // Build request body
-        let body = buildRequestBody(messages: messages, tools: tools, toolChoice: toolChoice)
+        let body = buildRequestBody(messages: messages, tools: tools, toolChoice: toolChoice, modelId: effectiveModelId)
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         // Log the request
@@ -193,20 +193,22 @@ final class BedrockClient {
     private func buildRequestBody(
         messages: [Message],
         tools: [any Tool],
-        toolChoice: ToolChoice
+        toolChoice: ToolChoice,
+        modelId: String
     ) -> [String: Any] {
+        let isOpus = modelId.contains("opus")
+
         var body: [String: Any] = [
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 21333,
-            "system": config.systemPrompt,
-            // Adaptive thinking: model decides when and how much to think
-            "thinking": [
-                "type": "adaptive"
-            ],
-            "output_config": [
-                "effort": "high"
-            ]
+            "system": config.systemPrompt
         ]
+
+        if isOpus {
+            // Adaptive thinking: model decides when and how much to think (Opus 4.6+)
+            body["thinking"] = ["type": "adaptive"]
+            body["output_config"] = ["effort": "high"]
+        }
 
         // Convert messages, ensuring proper alternation
         let apiMessages = ensureMessageAlternation(messages)
