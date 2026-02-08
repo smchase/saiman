@@ -76,9 +76,14 @@ struct ChatView: View {
     }
 
     private var loadingIndicator: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 6) {
             ProgressView()
                 .controlSize(.small)
+            if let statusText = viewModel.agentStatusText {
+                Text(statusText)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
             Spacer()
         }
         .frame(minHeight: 17)
@@ -96,7 +101,7 @@ struct ChatView: View {
             }
 
             // Input row
-            TextField("Ask anything...", text: $viewModel.inputText, axis: .vertical)
+            TextField("Ask anything", text: $viewModel.inputText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...4)
                 .focused($isInputFocused)

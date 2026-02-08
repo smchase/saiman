@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import AppKit
+import Combine
 import UserNotifications
 
 @MainActor
@@ -11,6 +12,7 @@ final class ChatViewModel: ObservableObject {
     @Published var currentConversation: Conversation?
     @Published var messages: [Message] = []
     @Published var isLoading: Bool = false
+    @Published var agentStatusText: String?
     @Published var errorMessage: String?
     @Published var pendingAttachments: [PendingAttachment] = []
 
@@ -30,6 +32,7 @@ final class ChatViewModel: ObservableObject {
     private let database = Database.shared
     private var agentLoops: [UUID: AgentLoop] = [:]  // One loop per conversation
     private let attachmentManager = AttachmentManager.shared
+    private var agentStateSubscription: AnyCancellable?
 
     /// Get or create an AgentLoop for a conversation
     private func agentLoop(for conversationId: UUID) -> AgentLoop {
@@ -66,6 +69,7 @@ final class ChatViewModel: ObservableObject {
             messages = database.getMessages(conversationId: conversation.id)
             // Restore loading state if this conversation has an in-progress request
             isLoading = loadingConversationIds.contains(conversation.id)
+            subscribeToAgentState(for: conversation.id)
         } else {
             startNewConversation()
         }
@@ -89,6 +93,7 @@ final class ChatViewModel: ObservableObject {
         errorMessage = nil
         // Restore loading state if this conversation has an in-progress request
         isLoading = loadingConversationIds.contains(conversation.id)
+        subscribeToAgentState(for: conversation.id)
         // Dismiss any pending notification for this conversation
         UNUserNotificationCenter.current().removeDeliveredNotifications(
             withIdentifiers: ["response-\(conversation.id.uuidString)"]
@@ -182,8 +187,17 @@ final class ChatViewModel: ObservableObject {
         }
         database.createMessage(userMessage)
 
+        // Subscribe to agent state for live status text
+        let loop = agentLoop(for: conversation.id)
+        agentStateSubscription = loop.$state
+            .sink { [weak self] state in
+                guard let self = self,
+                      self.currentConversation?.id == conversation.id else { return }
+                self.agentStatusText = self.statusText(for: state)
+            }
+
         // Run agent (use per-conversation loop for concurrent requests)
-        agentLoop(for: conversation.id).run(messages: messages) { [weak self] responseText, toolCalls in
+        loop.run(messages: messages) { [weak self] responseText, toolCalls in
             guard let self = self else { return }
 
             // Generate tool usage summary (if any tools were used)
@@ -319,6 +333,47 @@ final class ChatViewModel: ObservableObject {
         database.deleteConversation(id: conversation.id)
         if currentConversation?.id == conversation.id {
             startNewConversation()
+        }
+    }
+
+    // MARK: - Agent Status
+
+    /// Re-subscribe to agent state for a conversation (used when switching back to a loading conversation)
+    private func subscribeToAgentState(for conversationId: UUID) {
+        agentStateSubscription?.cancel()
+        guard loadingConversationIds.contains(conversationId),
+              let loop = agentLoops[conversationId] else {
+            agentStatusText = nil
+            return
+        }
+        agentStatusText = statusText(for: loop.state)
+        agentStateSubscription = loop.$state
+            .sink { [weak self] state in
+                guard let self = self,
+                      self.currentConversation?.id == conversationId else { return }
+                self.agentStatusText = self.statusText(for: state)
+            }
+    }
+
+    private func statusText(for state: AgentState) -> String? {
+        switch state {
+        case .thinking:
+            return "Thinking..."
+        case .executingTool(let toolName):
+            switch toolName {
+            case "web_search":
+                return "Searching the web..."
+            case "get_page_contents":
+                return "Reading the web..."
+            case "reddit_search":
+                return "Searching Reddit..."
+            case "reddit_read":
+                return "Reading Reddit..."
+            default:
+                return "Working..."
+            }
+        default:
+            return nil
         }
     }
 }
