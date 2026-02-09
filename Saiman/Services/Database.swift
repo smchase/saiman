@@ -27,7 +27,7 @@ final class Database {
         let dbPath = saimanDir.appendingPathComponent("saiman.db").path
 
         if sqlite3_open(dbPath, &db) != SQLITE_OK {
-            print("Error opening database: \(String(cString: sqlite3_errmsg(db)))")
+            Logger.shared.error("Error opening database: \(String(cString: sqlite3_errmsg(db)))")
             return
         }
 
@@ -126,7 +126,7 @@ final class Database {
         var errMsg: UnsafeMutablePointer<CChar>?
         if sqlite3_exec(db, sql, nil, nil, &errMsg) != SQLITE_OK {
             if let errMsg = errMsg {
-                print("SQL error: \(String(cString: errMsg))")
+                Logger.shared.error("SQL error: \(String(cString: errMsg))")
                 sqlite3_free(errMsg)
             }
         }

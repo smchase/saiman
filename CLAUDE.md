@@ -19,7 +19,7 @@ Do not run manual `xcodebuild` commands for testing. The release script handles 
 
 ## Environment
 
-Required in `.env` at project root:
+Required in `~/.saiman/.env`:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_REGION`

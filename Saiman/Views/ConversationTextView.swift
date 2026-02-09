@@ -138,8 +138,6 @@ struct ConversationTextView: NSViewRepresentable {
     // MARK: - Simple Markdown Parser
 
     private func parseMarkdown(_ text: String, baseAttributes: [NSAttributedString.Key: Any]) -> NSAttributedString {
-        // For now, just return plain text with base attributes
-        // TODO: Add proper markdown parsing (bold, italic, code, links)
         let result = NSMutableAttributedString(string: text, attributes: baseAttributes)
 
         // Simple bold parsing: **text**

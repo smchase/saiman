@@ -8,12 +8,12 @@ enum DotEnv {
     /// Load environment variables from ~/.saiman/.env
     static func load() {
         guard FileManager.default.fileExists(atPath: envFilePath) else {
-            print("[DotEnv] No .env file at \(envFilePath)")
+            Logger.shared.debug("[DotEnv] No .env file at \(envFilePath)")
             return
         }
 
         guard let contents = try? String(contentsOfFile: envFilePath, encoding: .utf8) else {
-            print("[DotEnv] Failed to read \(envFilePath)")
+            Logger.shared.error("[DotEnv] Failed to read \(envFilePath)")
             return
         }
 
@@ -47,6 +47,6 @@ enum DotEnv {
             }
         }
 
-        print("[DotEnv] Loaded \(loadedCount) variables from \(envFilePath)")
+        Logger.shared.info("[DotEnv] Loaded \(loadedCount) variables from \(envFilePath)")
     }
 }

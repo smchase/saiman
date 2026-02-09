@@ -96,9 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
 
         if status != noErr {
-            print("[Hotkey] Failed to register hotkey, error: \(status)")
+            Logger.shared.error("[Hotkey] Failed to register hotkey, error: \(status)")
         } else {
-            print("[Hotkey] Registered Option+Space successfully")
+            Logger.shared.info("[Hotkey] Registered Option+Space successfully")
         }
     }
 
