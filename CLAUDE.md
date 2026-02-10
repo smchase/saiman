@@ -58,6 +58,48 @@ tail -100 ~/.saiman/logs/saiman-$(date +%Y-%m-%d).log
 
 Logs include API requests/responses, tool calls, and errors. Use `Logger.shared.debug/info/error()` to add logs.
 
+## MarkdownUI Fork (Submodule)
+
+`Packages/swift-markdown-ui/` is a **git submodule** pointing to a fork of [gonzalezreal/swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui). It's maintained solely for this app.
+
+### How it works
+
+- The fork adds LaTeX math rendering (`$...$` and `$$...$$`) on top of the upstream MarkdownUI library.
+- It uses **MathJaxSwift** (MathJax 3.2.2 via JavaScriptCore) to render LaTeX to SVG, then **SwiftDraw** to rasterize to images.
+- A **MathPreprocessor** runs before cmark-gfm to protect math expressions from cmark's backslash escaping. It replaces math with base64-encoded placeholders, which the extraction step decodes after parsing.
+
+### Making changes to the fork
+
+Edit files directly in `Packages/swift-markdown-ui/`. Then **commit and push within the submodule** before building:
+
+```bash
+cd Packages/swift-markdown-ui
+git add -A && git commit -m "description" && git push
+cd ../..
+```
+
+After pushing, update the submodule pointer in the main repo:
+
+```bash
+git add Packages/swift-markdown-ui && git commit -m "Update submodule"
+```
+
+The release script uses incremental builds. If the fork's changes don't take effect, clear derived data:
+
+```bash
+rm -rf ~/Library/Developer/Xcode/DerivedData/Saiman-*
+```
+
+### Key files in the fork
+
+- `Parser/MathPreprocessor.swift` — Pre-processes raw markdown to protect `$`/`$$` math from cmark
+- `Parser/BlockNode+Math.swift` — Extracts `$$MATH_BLOCK:base64$$` placeholders into `.mathBlock` nodes
+- `Parser/InlineNode+Math.swift` — Extracts `$MATH:base64$` placeholders into `.math` nodes
+- `Parser/MarkdownParser.swift` — Hooks preprocessor before `cmark_parser_feed`
+- `Renderer/MathRenderer.swift` — MathJax rendering (loads all TeX packages via `Packages.all`)
+- `Views/Blocks/MathBlockView.swift` — SwiftUI view for block math
+- `Renderer/TextInlineRenderer.swift` — Renders inline math as images in Text
+
 ## Troubleshooting
 
 **Build issues?** If you encounter strange behavior after renaming/deleting files, stale build artifacts may be the cause. Run a clean build:
