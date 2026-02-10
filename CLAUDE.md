@@ -25,6 +25,29 @@ Required in `~/.saiman/.env`:
 - `AWS_REGION`
 - `EXA_API_KEY`
 
+## Database
+
+Conversations and messages are stored in SQLite at:
+```
+~/Library/Application Support/Saiman/saiman.db
+```
+
+Useful queries for debugging:
+
+```bash
+# Last 5 conversations
+sqlite3 ~/Library/Application\ Support/Saiman/saiman.db \
+  "SELECT id, title, datetime(updated_at, 'unixepoch', 'localtime') FROM conversations ORDER BY updated_at DESC LIMIT 5;"
+
+# Last agent message from most recent conversation (raw content)
+sqlite3 ~/Library/Application\ Support/Saiman/saiman.db \
+  "SELECT content FROM messages WHERE conversation_id = (SELECT id FROM conversations ORDER BY updated_at DESC LIMIT 1) AND role = 'assistant' ORDER BY created_at DESC LIMIT 1;"
+
+# All messages from most recent conversation
+sqlite3 -json ~/Library/Application\ Support/Saiman/saiman.db \
+  "SELECT role, content, tool_calls FROM messages WHERE conversation_id = (SELECT id FROM conversations ORDER BY updated_at DESC LIMIT 1) ORDER BY created_at ASC;"
+```
+
 ## Logging
 
 Logs are written to `~/.saiman/logs/saiman-YYYY-MM-DD.log`. To view recent logs:

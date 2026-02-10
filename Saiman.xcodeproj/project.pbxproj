@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		C1000001 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = C2000001 /* MarkdownUI */; };
-		A1000030 /* ContentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000030; };
 		A1000001 /* SaimanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001; };
 		A1000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002; };
 		A1000003 /* SpotlightPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000003; };
@@ -96,7 +95,6 @@
 		B2000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		B2000002 /* Evals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Evals.swift; sourceTree = "<group>"; };
 		B3000001 /* SaimanTests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SaimanTests; sourceTree = BUILT_PRODUCTS_DIR; };
-		A2000030 /* ContentParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentParser.swift; sourceTree = "<group>"; };
 		A2000031 /* RedditSearchTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedditSearchTool.swift; sourceTree = "<group>"; };
 		A2000032 /* RedditReadTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedditReadTool.swift; sourceTree = "<group>"; };
 		A2000033 /* RedditClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedditClient.swift; sourceTree = "<group>"; };
@@ -138,7 +136,6 @@
 				A5000005 /* Agent */,
 				A5000006 /* Services */,
 				A5000007 /* Models */,
-				A5000010 /* Utilities */,
 				A5000009 /* Resources */,
 				A3000002 /* Saiman.entitlements */,
 				A3000003 /* Info.plist */,
@@ -234,14 +231,6 @@
 				B2000002 /* Evals.swift */,
 			);
 			path = SaimanTests;
-			sourceTree = "<group>";
-		};
-		A5000010 /* Utilities */ = {
-			isa = PBXGroup;
-			children = (
-				A2000030 /* ContentParser.swift */,
-			);
-			path = Utilities;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -365,7 +354,6 @@
 				A1000025 /* AttachmentManager.swift in Sources */,
 				A1000028 /* TokenTracker.swift in Sources */,
 				A1000029 /* GetPageContentsTool.swift in Sources */,
-				A1000030 /* ContentParser.swift in Sources */,
 				A1000031 /* RedditSearchTool.swift in Sources */,
 				A1000032 /* RedditReadTool.swift in Sources */,
 				A1000033 /* RedditClient.swift in Sources */,
