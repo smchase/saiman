@@ -89,12 +89,4 @@ final class Logger {
         log(msg, level: "DEBUG")
     }
 
-    func logError(_ error: Error) {
-        log("Error: \(error.localizedDescription)", level: "ERROR")
-    }
-
-    /// Get path to current log file
-    var currentLogPath: String {
-        logFile.path
-    }
 }

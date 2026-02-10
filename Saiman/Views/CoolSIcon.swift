@@ -1,20 +1,5 @@
-import SwiftUI
 import AppKit
 
-/// Cool S icon view for SwiftUI
-struct CoolSIcon: View {
-    var size: CGFloat = 16
-    var color: Color = .primary
-
-    var body: some View {
-        Image(nsImage: NSImage.coolSIcon(size: size))
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .frame(width: size, height: size)
-    }
-}
-
-// NSImage extension for menu bar
 extension NSImage {
     static func coolSIcon(size: CGFloat = 18) -> NSImage {
         // Load from bundle

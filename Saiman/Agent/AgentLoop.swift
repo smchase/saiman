@@ -6,7 +6,6 @@ enum AgentState {
     case idle
     case thinking
     case executingTool(String)
-    case responding
     case error(Error)
     case cancelled
 }
@@ -18,8 +17,6 @@ enum AgentState {
 @MainActor
 final class AgentLoop: ObservableObject {
     @Published private(set) var state: AgentState = .idle
-    @Published private(set) var currentResponse: String = ""
-    @Published private(set) var toolCallCount: Int = 0
 
     private let bedrockClient = BedrockClient()
     private let toolRegistry = ToolRegistry()
@@ -47,8 +44,6 @@ final class AgentLoop: ObservableObject {
         currentTask?.cancel()
         currentTask = nil
         state = .cancelled
-        currentResponse = ""
-        toolCallCount = 0
     }
 
     private func executeLoop(
@@ -60,8 +55,6 @@ final class AgentLoop: ObservableObject {
         var iterations = 0
 
         state = .thinking
-        currentResponse = ""
-        toolCallCount = 0
 
         Logger.shared.info("AgentLoop starting with \(messages.count) messages")
 
@@ -102,11 +95,6 @@ final class AgentLoop: ObservableObject {
                 return
             }
 
-            // Update current response with any text
-            if !response.text.isEmpty {
-                currentResponse = response.text
-            }
-
             // If no tool calls, we're done
             if response.toolCalls.isEmpty {
                 state = .idle
@@ -125,7 +113,6 @@ final class AgentLoop: ObservableObject {
                 }
 
                 state = .executingTool(toolCall.name)
-                toolCallCount += 1
                 Logger.shared.debug("Executing tool: \(toolCall.name) with args: \(toolCall.arguments)")
 
                 do {

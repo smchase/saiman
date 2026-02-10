@@ -226,7 +226,6 @@ final class SpotlightPanelController: ObservableObject {
         // Restore draft
         viewModel.inputText = snapshot.inputText
         viewModel.pendingAttachments = snapshot.attachments
-        viewModel.errorMessage = nil
 
         return true
     }
@@ -237,7 +236,6 @@ final class SpotlightPanelController: ObservableObject {
         viewModel.messages = []
         viewModel.inputText = ""
         viewModel.pendingAttachments = []
-        viewModel.errorMessage = nil
     }
 
     // MARK: - Panel Visibility

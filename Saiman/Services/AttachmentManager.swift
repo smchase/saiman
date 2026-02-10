@@ -192,14 +192,4 @@ final class AttachmentManager: @unchecked Sendable {
         return PendingAttachment(filename: filename, data: data)
     }
 
-    // MARK: - Open in Default App
-
-    /// Open attachment in default application
-    func openInDefaultApp(_ attachment: Attachment) {
-        guard attachment.fileExists else {
-            Logger.shared.error("Cannot open attachment - file not found: \(attachment.relativePath)")
-            return
-        }
-        NSWorkspace.shared.open(attachment.fullPath)
-    }
 }

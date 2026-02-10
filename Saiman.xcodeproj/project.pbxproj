@@ -33,8 +33,6 @@
 		A1000023 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000023; };
 		A1000024 /* Attachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000024; };
 		A1000025 /* AttachmentManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000025; };
-		A1000026 /* BubbleLayoutFragment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000026; };
-		A1000027 /* ConversationTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000027; };
 		A1000028 /* TokenTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000028; };
 		A1000029 /* GetPageContentsTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000029; };
 		B1000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001; };

@@ -120,10 +120,6 @@ final class ToolRegistry {
         tools[tool.name] = tool
     }
 
-    func unregister(name: String) {
-        tools.removeValue(forKey: name)
-    }
-
     func get(name: String) -> (any Tool)? {
         tools[name]
     }

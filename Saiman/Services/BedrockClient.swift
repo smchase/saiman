@@ -102,27 +102,7 @@ struct AgentResponse {
     let text: String
     let toolCalls: [ToolCall]
     let thinkingBlocks: [ThinkingBlock]
-    let stopReason: String?
     let usage: UsageData?
-}
-
-// MARK: - Tool Choice
-
-enum ToolChoice {
-    case auto           // Let Claude decide whether to use tools
-    case any            // Claude must use at least one tool
-    case tool(String)   // Claude must use a specific tool
-
-    func toDict() -> [String: Any] {
-        switch self {
-        case .auto:
-            return ["type": "auto"]
-        case .any:
-            return ["type": "any"]
-        case .tool(let name):
-            return ["type": "tool", "name": name]
-        }
-    }
 }
 
 // MARK: - Bedrock Client
@@ -141,7 +121,6 @@ final class BedrockClient {
     func sendMessage(
         messages: [Message],
         tools: [any Tool],
-        toolChoice: ToolChoice = .auto,
         modelId: String? = nil
     ) async throws -> AgentResponse {
         let effectiveModelId = modelId ?? config.bedrockModelId
@@ -153,7 +132,7 @@ final class BedrockClient {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         // Build request body
-        let body = buildRequestBody(messages: messages, tools: tools, toolChoice: toolChoice, modelId: effectiveModelId)
+        let body = buildRequestBody(messages: messages, tools: tools, modelId: effectiveModelId)
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         // Log the request
@@ -193,7 +172,6 @@ final class BedrockClient {
     private func buildRequestBody(
         messages: [Message],
         tools: [any Tool],
-        toolChoice: ToolChoice,
         modelId: String
     ) -> [String: Any] {
         let isOpus = modelId.contains("opus")
@@ -219,11 +197,7 @@ final class BedrockClient {
             // Tool definitions with strict JSON schema enforcement
             body["tools"] = tools.map { $0.toBedrockFormat() }
 
-            // tool_choice controls how Claude uses tools:
-            // - "auto": Claude decides (default)
-            // - "any": Must use at least one tool
-            // - "tool": Must use specific tool
-            body["tool_choice"] = toolChoice.toDict()
+            body["tool_choice"] = ["type": "auto"]
         }
 
         return body
@@ -347,7 +321,7 @@ final class BedrockClient {
             }
         }
 
-        return AgentResponse(text: text, toolCalls: toolCalls, thinkingBlocks: thinkingBlocks, stopReason: response.stopReason, usage: response.usage)
+        return AgentResponse(text: text, toolCalls: toolCalls, thinkingBlocks: thinkingBlocks, usage: response.usage)
     }
 
     // MARK: - AWS Signature V4

@@ -183,22 +183,6 @@ final class Database {
         }
     }
 
-    func getMostRecentConversation() -> Conversation? {
-        queue.sync {
-            let sql = "SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC LIMIT 1;"
-            var stmt: OpaquePointer?
-            var conversation: Conversation?
-
-            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-                if sqlite3_step(stmt) == SQLITE_ROW {
-                    conversation = conversationFromStatement(stmt)
-                }
-            }
-            sqlite3_finalize(stmt)
-            return conversation
-        }
-    }
-
     func getAllConversations() -> [Conversation] {
         queue.sync {
             let sql = "SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC LIMIT 20;"
@@ -349,24 +333,6 @@ final class Database {
             }
             sqlite3_finalize(stmt)
             return messages
-        }
-    }
-
-    func getLastMessage(conversationId: UUID) -> Message? {
-        queue.sync {
-            let sql = "SELECT id, conversation_id, role, content, tool_calls, attachments, tool_usage_summary, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1;"
-            var stmt: OpaquePointer?
-            var message: Message?
-
-            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt, 1, conversationId.uuidString, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-
-                if sqlite3_step(stmt) == SQLITE_ROW {
-                    message = messageFromStatement(stmt)
-                }
-            }
-            sqlite3_finalize(stmt)
-            return message
         }
     }
 

@@ -1,4 +1,3 @@
-import Foundation
 import SwiftUI
 import AppKit
 import Combine
@@ -13,7 +12,6 @@ final class ChatViewModel: ObservableObject {
     @Published var messages: [Message] = []
     @Published var isLoading: Bool = false
     @Published var agentStatusText: String?
-    @Published var errorMessage: String?
     @Published var pendingAttachments: [PendingAttachment] = []
 
     // Track pending message per conversation for cancel/restore
@@ -46,10 +44,6 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - Computed Properties
 
-    var lastUserMessage: Message? {
-        messages.last { $0.role == .user }
-    }
-
     var canAddAttachment: Bool {
         pendingAttachments.count < AttachmentConstants.maxAttachmentsPerMessage
     }
@@ -62,25 +56,11 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - Conversation Management
 
-    func loadMostRecentConversation() {
-        if let conversation = database.getMostRecentConversation(),
-           !conversation.isStale {
-            currentConversation = conversation
-            messages = database.getMessages(conversationId: conversation.id)
-            // Restore loading state if this conversation has an in-progress request
-            isLoading = loadingConversationIds.contains(conversation.id)
-            subscribeToAgentState(for: conversation.id)
-        } else {
-            startNewConversation()
-        }
-    }
-
     func startNewConversation() {
         currentConversation = nil
         messages = []
         inputText = ""
         pendingAttachments = []
-        errorMessage = nil
         isLoading = false
     }
 
@@ -90,7 +70,6 @@ final class ChatViewModel: ObservableObject {
         // Clear draft when navigating via menu (not session restore)
         inputText = ""
         pendingAttachments = []
-        errorMessage = nil
         // Restore loading state if this conversation has an in-progress request
         isLoading = loadingConversationIds.contains(conversation.id)
         subscribeToAgentState(for: conversation.id)
@@ -103,10 +82,7 @@ final class ChatViewModel: ObservableObject {
     // MARK: - Attachment Management
 
     func addAttachment(_ pending: PendingAttachment) {
-        guard canAddAttachment else {
-            errorMessage = "Maximum \(AttachmentConstants.maxAttachmentsPerMessage) images allowed"
-            return
-        }
+        guard canAddAttachment else { return }
         pendingAttachments.append(pending)
     }
 
@@ -115,9 +91,6 @@ final class ChatViewModel: ObservableObject {
         let toAdd = Array(newAttachments.prefix(remaining))
         pendingAttachments.append(contentsOf: toAdd)
 
-        if newAttachments.count > remaining {
-            errorMessage = "Maximum \(AttachmentConstants.maxAttachmentsPerMessage) images allowed"
-        }
     }
 
     func removeAttachment(_ id: UUID) {
@@ -144,7 +117,6 @@ final class ChatViewModel: ObservableObject {
         let messageAttachments = pendingAttachments
         inputText = ""
         pendingAttachments = []
-        errorMessage = nil
         isLoading = true
 
         // Create conversation in memory if needed (not persisted yet)
@@ -314,10 +286,6 @@ final class ChatViewModel: ObservableObject {
             return database.getAllConversations()
         }
         return database.searchConversations(query: query)
-    }
-
-    func getAllConversations() -> [Conversation] {
-        database.getAllConversations()
     }
 
     func deleteConversation(_ conversation: Conversation) {
