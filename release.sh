@@ -9,10 +9,6 @@ echo "Quitting Saiman..."
 osascript -e 'quit app "Saiman"' 2>/dev/null || pkill -f "Saiman" 2>/dev/null || true
 sleep 1
 
-echo "Updating MarkdownUI submodule..."
-# Initialize submodule if needed, then pull latest from remote
-git submodule update --init --remote Packages/swift-markdown-ui
-
 echo "Building release version..."
 xcodebuild -scheme Saiman -configuration Release build 2>&1 | grep -E "(error:|warning:|BUILD)" | grep -v "warning: duplicate output"
 
