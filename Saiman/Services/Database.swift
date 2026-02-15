@@ -31,6 +31,8 @@ final class Database {
             return
         }
 
+        sqlite3_exec(db, "PRAGMA foreign_keys = ON;", nil, nil, nil)
+
         createTables()
     }
 
