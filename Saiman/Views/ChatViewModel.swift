@@ -13,6 +13,7 @@ final class ChatViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var agentStatusText: String?
     @Published var pendingAttachments: [PendingAttachment] = []
+    @Published var recentConversations: [Conversation] = []
 
     // Track pending message per conversation for cancel/restore
     private struct PendingMessage {
@@ -52,6 +53,7 @@ final class ChatViewModel: ObservableObject {
 
     init() {
         // Start blank - session restoration is handled by SpotlightPanelController
+        recentConversations = database.getAllConversations()
     }
 
     // MARK: - Conversation Management
@@ -156,6 +158,7 @@ final class ChatViewModel: ObservableObject {
         // Save conversation and user message immediately so they persist if popup is closed
         if database.getConversation(id: conversation.id) == nil {
             database.createConversation(conversation)
+            refreshRecentConversations()
         }
         database.createMessage(userMessage)
 
@@ -190,6 +193,7 @@ final class ChatViewModel: ObservableObject {
             var updatedConversation = conversation
             updatedConversation.updatedAt = Date()
             self.database.updateConversation(updatedConversation)
+            self.refreshRecentConversations()
 
             // Request completed - remove from tracking sets
             self.loadingConversationIds.remove(conversation.id)
@@ -208,11 +212,14 @@ final class ChatViewModel: ObservableObject {
             // Update title after each exchange (DB always, UI only if still current)
             Task {
                 if let title = await self.agentLoop(for: conversation.id).generateTitle(for: self.database.getMessages(conversationId: conversation.id)) {
-                    var conv = updatedConversation
-                    conv.title = title
-                    self.database.updateConversation(conv)
-                    if self.currentConversation?.id == conversation.id {
-                        self.currentConversation = conv
+                    // Read fresh from DB to avoid overwriting newer timestamps from subsequent messages
+                    if var conv = self.database.getConversation(id: conversation.id) {
+                        conv.title = title
+                        self.database.updateConversation(conv)
+                        self.refreshRecentConversations()
+                        if self.currentConversation?.id == conversation.id {
+                            self.currentConversation = conv
+                        }
                     }
                 }
             }
@@ -275,11 +282,16 @@ final class ChatViewModel: ObservableObject {
         if messages.isEmpty {
             agentLoops.removeValue(forKey: conversation.id)
             database.deleteConversation(id: conversation.id)
+            refreshRecentConversations()
             currentConversation = nil
         }
     }
 
-    // MARK: - Search
+    // MARK: - Conversations
+
+    private func refreshRecentConversations() {
+        recentConversations = database.getAllConversations()
+    }
 
     func searchConversations(query: String) -> [Conversation] {
         if query.isEmpty {
@@ -299,6 +311,7 @@ final class ChatViewModel: ObservableObject {
         attachmentManager.deleteAll(for: conversation.id)
 
         database.deleteConversation(id: conversation.id)
+        refreshRecentConversations()
         if currentConversation?.id == conversation.id {
             startNewConversation()
         }

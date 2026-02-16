@@ -3,7 +3,7 @@ import AppKit
 import Carbon.HIToolbox
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var hotKeyRef: EventHotKeyRef?
@@ -51,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover?.contentSize = NSSize(width: 280, height: 400)
         popover?.behavior = .transient
         popover?.animates = false
+        popover?.delegate = self
         popover?.contentViewController = NSHostingController(
             rootView: MenuBarView(viewModel: viewModel)
         )
@@ -62,10 +63,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            // Notify MenuBarView to refresh before showing
-            NotificationCenter.default.post(name: .menuBarPopoverWillShow, object: nil)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
+    }
+
+    func popoverDidShow(_ notification: Notification) {
+        NotificationCenter.default.post(name: .menuBarPopoverDidShow, object: nil)
     }
 
     // MARK: - Global Hotkey
@@ -140,5 +143,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - Notification Names
 
 extension Notification.Name {
-    static let menuBarPopoverWillShow = Notification.Name("menuBarPopoverWillShow")
+    static let menuBarPopoverDidShow = Notification.Name("menuBarPopoverDidShow")
 }

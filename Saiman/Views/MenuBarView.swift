@@ -6,12 +6,11 @@ private let visibleConversationRows: Int = 5
 struct MenuBarView: View {
     @ObservedObject var viewModel: ChatViewModel
     @State private var searchText: String = ""
-    @State private var conversations: [Conversation]
+    @State private var searchResults: [Conversation]?
     @FocusState private var isSearchFocused: Bool
 
-    init(viewModel: ChatViewModel) {
-        self.viewModel = viewModel
-        _conversations = State(initialValue: viewModel.searchConversations(query: ""))
+    private var displayedConversations: [Conversation] {
+        searchText.isEmpty ? viewModel.recentConversations : (searchResults ?? [])
     }
 
     var body: some View {
@@ -27,7 +26,7 @@ struct MenuBarView: View {
                     .font(.system(size: 12))
                     .focused($isSearchFocused)
                     .onChange(of: searchText) { _, newValue in
-                        refreshConversations(query: newValue)
+                        searchResults = newValue.isEmpty ? nil : viewModel.searchConversations(query: newValue)
                     }
 
             }
@@ -38,7 +37,7 @@ struct MenuBarView: View {
 
             // Conversations list
             Group {
-                if conversations.isEmpty {
+                if displayedConversations.isEmpty {
                     emptyState
                 } else {
                     conversationsList
@@ -52,9 +51,9 @@ struct MenuBarView: View {
             footerActions
         }
         .frame(width: 280)
-        .onReceive(NotificationCenter.default.publisher(for: .menuBarPopoverWillShow)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .menuBarPopoverDidShow)) { _ in
             searchText = ""
-            refreshConversations(query: "")
+            searchResults = nil
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isSearchFocused = true
             }
@@ -82,7 +81,7 @@ struct MenuBarView: View {
     private var conversationsList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(conversations) { conversation in
+                ForEach(displayedConversations) { conversation in
                     ConversationRow(
                         conversation: conversation,
                         onSelect: {
@@ -91,7 +90,6 @@ struct MenuBarView: View {
                         },
                         onDelete: {
                             viewModel.deleteConversation(conversation)
-                            refreshConversations(query: searchText)
                         }
                     )
                 }
@@ -126,11 +124,6 @@ struct MenuBarView: View {
         .contentShape(Rectangle())
     }
 
-    // MARK: - Helpers
-
-    private func refreshConversations(query: String = "") {
-        conversations = viewModel.searchConversations(query: query)
-    }
 }
 
 // MARK: - Conversation Row
