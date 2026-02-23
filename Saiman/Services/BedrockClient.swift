@@ -189,7 +189,7 @@ final class BedrockClient {
         }
 
         // Convert messages, ensuring proper alternation
-        let apiMessages = ensureMessageAlternation(messages)
+        let apiMessages = formatMessages(messages)
         body["messages"] = apiMessages
 
         // Add tools if available with proper tool_choice for structured output
@@ -203,72 +203,9 @@ final class BedrockClient {
         return body
     }
 
-    /// Ensures messages alternate properly (user/assistant/user/assistant).
-    /// Claude API requires this strict alternation. This function:
-    /// 1. Filters out system messages (they go in the system field)
-    /// 2. Skips empty or error messages
-    /// 3. Merges consecutive messages of the same role
-    private func ensureMessageAlternation(_ messages: [Message]) -> [[String: Any]] {
-        // Filter out system messages
-        let nonSystemMessages = messages.filter { $0.role != .system }
-
-        guard !nonSystemMessages.isEmpty else { return [] }
-
-        var result: [[String: Any]] = []
-        var currentRole: MessageRole? = nil
-
-        for message in nonSystemMessages {
-            let messageDict = message.toBedrockFormat()
-
-            // Skip empty messages (e.g., error messages or cancelled responses)
-            if let content = messageDict["content"] as? String,
-               content.isEmpty || content.hasPrefix("Error:") {
-                continue
-            }
-
-            // If same role as previous, merge content
-            if message.role == currentRole, !result.isEmpty {
-                // Merge with previous message
-                var lastMessage = result.removeLast()
-                let newContent = mergeContent(
-                    existing: lastMessage["content"],
-                    new: messageDict["content"]
-                )
-                lastMessage["content"] = newContent
-                result.append(lastMessage)
-            } else {
-                // Different role - ensure alternation
-                result.append(messageDict)
-                currentRole = message.role
-            }
-        }
-
-        return result
-    }
-
-    /// Merges content from two messages (handles both string and array formats)
-    private func mergeContent(existing: Any?, new: Any?) -> Any {
-        // Convert both to arrays
-        let existingArray: [[String: Any]]
-        let newArray: [[String: Any]]
-
-        if let str = existing as? String {
-            existingArray = str.isEmpty ? [] : [["type": "text", "text": str]]
-        } else if let arr = existing as? [[String: Any]] {
-            existingArray = arr
-        } else {
-            existingArray = []
-        }
-
-        if let str = new as? String {
-            newArray = str.isEmpty ? [] : [["type": "text", "text": str]]
-        } else if let arr = new as? [[String: Any]] {
-            newArray = arr
-        } else {
-            newArray = []
-        }
-
-        return existingArray + newArray
+    /// Converts messages to Bedrock API format.
+    private func formatMessages(_ messages: [Message]) -> [[String: Any]] {
+        messages.map { $0.toBedrockFormat() }
     }
 
     private func parseResponse(_ response: BedrockResponse) -> AgentResponse {
