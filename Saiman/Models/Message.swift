@@ -47,6 +47,12 @@ struct Message: Identifiable, Codable {
         self.createdAt = createdAt
     }
 
+    /// Whether this message should be shown in the UI.
+    /// Intermediate messages (tool_use/tool_result) are hidden.
+    var isDisplayMessage: Bool {
+        toolCalls == nil || toolCalls!.isEmpty
+    }
+
     /// Content with the dynamic context prefix stripped, for UI display.
     /// Messages are stored with a `[Current date: ... | Location: ...]` prefix for API context/caching.
     /// Old messages without the prefix are returned as-is.

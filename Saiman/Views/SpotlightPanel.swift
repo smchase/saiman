@@ -216,7 +216,7 @@ final class SpotlightPanelController: ObservableObject {
                 return false
             }
             viewModel.currentConversation = conversation
-            viewModel.messages = Database.shared.getMessages(conversationId: conversationId)
+            viewModel.messages = Database.shared.getMessages(conversationId: conversationId).filter(\.isDisplayMessage)
         } else {
             // Was a new conversation (no messages yet)
             viewModel.currentConversation = nil

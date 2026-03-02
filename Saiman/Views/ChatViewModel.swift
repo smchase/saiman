@@ -66,14 +66,9 @@ final class ChatViewModel: ObservableObject {
         isLoading = false
     }
 
-    /// Messages with tool calls are intermediate (tool_use/tool_result) and hidden from UI.
-    private static func isDisplayMessage(_ message: Message) -> Bool {
-        message.toolCalls == nil || message.toolCalls!.isEmpty
-    }
-
     func loadConversation(_ conversation: Conversation) {
         currentConversation = conversation
-        messages = database.getMessages(conversationId: conversation.id).filter(Self.isDisplayMessage)
+        messages = database.getMessages(conversationId: conversation.id).filter(\.isDisplayMessage)
         // Clear draft when navigating via menu (not session restore)
         inputText = ""
         pendingAttachments = []
@@ -236,7 +231,7 @@ final class ChatViewModel: ObservableObject {
 
             // Update title after each exchange (DB always, UI only if still current)
             Task {
-                if let title = await self.agentLoop(for: conversation.id).generateTitle(for: self.database.getMessages(conversationId: conversation.id).filter(Self.isDisplayMessage)) {
+                if let title = await self.agentLoop(for: conversation.id).generateTitle(for: self.database.getMessages(conversationId: conversation.id).filter(\.isDisplayMessage)) {
                     // Read fresh from DB to avoid overwriting newer timestamps from subsequent messages
                     if var conv = self.database.getConversation(id: conversation.id) {
                         conv.title = title
