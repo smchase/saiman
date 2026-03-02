@@ -524,9 +524,8 @@ func askAndCapture(_ question: String) async -> EvalContext {
     let agentLoop = AgentLoop()
     let conversationId = UUID()
 
-    let userMessage = Message(
+    let userMessage = Message.userMessage(
         conversationId: conversationId,
-        role: .user,
         content: question
     )
 

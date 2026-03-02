@@ -261,6 +261,22 @@ final class Database {
         }
     }
 
+    /// Delete all messages in a conversation created after (not including) the given timestamp.
+    /// Used to clean up intermediate tool messages when the user cancels a request.
+    func deleteMessages(conversationId: UUID, after date: Date) {
+        queue.sync {
+            let sql = "DELETE FROM messages WHERE conversation_id = ? AND created_at > ?;"
+            var stmt: OpaquePointer?
+
+            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+                sqlite3_bind_text(stmt, 1, conversationId.uuidString, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_double(stmt, 2, date.timeIntervalSince1970)
+                sqlite3_step(stmt)
+            }
+            sqlite3_finalize(stmt)
+        }
+    }
+
     private func conversationFromStatement(_ stmt: OpaquePointer?) -> Conversation? {
         guard let idStr = sqlite3_column_text(stmt, 0),
               let titleStr = sqlite3_column_text(stmt, 1),

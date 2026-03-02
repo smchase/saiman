@@ -18,18 +18,15 @@ final class TokenTracker: ObservableObject {
         self.totalOutputTokens = UserDefaults.standard.integer(forKey: outputTokensKey)
     }
 
-    /// Add token usage from an API response
+    /// Add token usage from an API response.
+    /// Counts only non-cached input tokens (inputTokens + cacheCreationInputTokens).
+    /// Cache reads are reused computation and not counted.
     func add(usage: UsageData?) {
         guard let usage = usage else { return }
-        add(inputTokens: usage.inputTokens, outputTokens: usage.outputTokens)
-    }
-
-    /// Add token usage with explicit counts
-    func add(inputTokens: Int, outputTokens: Int) {
+        let newInputTokens = usage.inputTokens + usage.cacheCreationInputTokens
         DispatchQueue.main.async { [self] in
-            totalInputTokens += inputTokens
-            totalOutputTokens += outputTokens
-            // Persist to UserDefaults
+            totalInputTokens += newInputTokens
+            totalOutputTokens += usage.outputTokens
             UserDefaults.standard.set(totalInputTokens, forKey: inputTokensKey)
             UserDefaults.standard.set(totalOutputTokens, forKey: outputTokensKey)
         }

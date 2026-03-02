@@ -20,10 +20,23 @@ struct BedrockResponse: Codable {
 struct UsageData: Codable {
     let inputTokens: Int
     let outputTokens: Int
+    let cacheCreationInputTokens: Int
+    let cacheReadInputTokens: Int
 
     enum CodingKeys: String, CodingKey {
         case inputTokens = "input_tokens"
         case outputTokens = "output_tokens"
+        case cacheCreationInputTokens = "cache_creation_input_tokens"
+        case cacheReadInputTokens = "cache_read_input_tokens"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        inputTokens = try container.decode(Int.self, forKey: .inputTokens)
+        outputTokens = try container.decode(Int.self, forKey: .outputTokens)
+        // Cache fields default to 0 when absent (e.g. Haiku title generation without caching)
+        cacheCreationInputTokens = try container.decodeIfPresent(Int.self, forKey: .cacheCreationInputTokens) ?? 0
+        cacheReadInputTokens = try container.decodeIfPresent(Int.self, forKey: .cacheReadInputTokens) ?? 0
     }
 }
 
@@ -169,6 +182,11 @@ final class BedrockClient {
         return agentResponse
     }
 
+    private static let cacheControl: [String: Any] = ["type": "ephemeral", "ttl": "1h"]
+
+    /// Number of recent tool cycles to keep full results for. Older results are replaced with a placeholder.
+    private static let recentToolCyclesToKeep = 3
+
     private func buildRequestBody(
         messages: [Message],
         tools: [any Tool],
@@ -183,29 +201,87 @@ final class BedrockClient {
         ]
 
         if isOpus {
-            // Adaptive thinking: model decides when and how much to think (Opus 4.6+)
             body["thinking"] = ["type": "adaptive"]
             body["output_config"] = ["effort": "high"]
         }
 
-        // Convert messages, ensuring proper alternation
-        let apiMessages = formatMessages(messages)
-        body["messages"] = apiMessages
+        body["messages"] = formatMessages(messages)
 
-        // Add tools if available with proper tool_choice for structured output
         if !tools.isEmpty {
-            // Tool definitions with strict JSON schema enforcement
-            body["tools"] = tools.map { $0.toBedrockFormat() }
-
+            var toolDefs = tools.map { $0.toBedrockFormat() }
+            if var lastTool = toolDefs.last {
+                lastTool["cache_control"] = Self.cacheControl
+                toolDefs[toolDefs.count - 1] = lastTool
+            }
+            body["tools"] = toolDefs
             body["tool_choice"] = ["type": "auto"]
         }
 
         return body
     }
 
-    /// Converts messages to Bedrock API format.
+    /// Converts messages to Bedrock API format with prompt caching support.
+    /// Places cache checkpoints on the second-to-last and last messages,
+    /// and clears old tool result content (keeps last N cycles intact).
     private func formatMessages(_ messages: [Message]) -> [[String: Any]] {
-        messages.map { $0.toBedrockFormat() }
+        let clearIndices = toolResultIndicesToClear(in: messages)
+
+        var formatted: [[String: Any]] = []
+        for (i, message) in messages.enumerated() {
+            var dict = message.toBedrockFormat()
+
+            if clearIndices.contains(i) {
+                dict = clearToolResultContent(in: dict)
+            }
+
+            if messages.count >= 2 && (i == messages.count - 2 || i == messages.count - 1) {
+                dict = addCacheCheckpoint(to: dict)
+            }
+
+            formatted.append(dict)
+        }
+        return formatted
+    }
+
+    /// Returns indices of tool result messages whose content should be cleared.
+    private func toolResultIndicesToClear(in messages: [Message]) -> Set<Int> {
+        var toolResultIndices: [Int] = []
+        for (i, msg) in messages.enumerated() {
+            if msg.role == .user, let calls = msg.toolCalls, !calls.isEmpty, calls.first?.result != nil {
+                toolResultIndices.append(i)
+            }
+        }
+        if toolResultIndices.count <= Self.recentToolCyclesToKeep { return [] }
+        return Set(toolResultIndices.dropLast(Self.recentToolCyclesToKeep))
+    }
+
+    /// Replaces tool_result content with a placeholder.
+    private func clearToolResultContent(in dict: [String: Any]) -> [String: Any] {
+        var result = dict
+        guard var contentArray = result["content"] as? [[String: Any]] else { return result }
+        for (j, block) in contentArray.enumerated() {
+            if block["type"] as? String == "tool_result" {
+                var cleared = block
+                cleared["content"] = "[Tool result cleared to save context]"
+                contentArray[j] = cleared
+            }
+        }
+        result["content"] = contentArray
+        return result
+    }
+
+    /// Adds a cache_control checkpoint to the last content block of a formatted message.
+    private func addCacheCheckpoint(to dict: [String: Any]) -> [String: Any] {
+        var result = dict
+        if result["content"] is String {
+            // Convert to array format so we can attach cache_control to the block
+            let text = result["content"] as! String
+            result["content"] = [["type": "text", "text": text, "cache_control": Self.cacheControl]]
+        } else if var contentArray = result["content"] as? [[String: Any]], !contentArray.isEmpty {
+            contentArray[contentArray.count - 1]["cache_control"] = Self.cacheControl
+            result["content"] = contentArray
+        }
+        return result
     }
 
     private func parseResponse(_ response: BedrockResponse) -> AgentResponse {

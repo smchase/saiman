@@ -27,15 +27,17 @@ final class AgentLoop: ObservableObject {
     /// Run the agent loop with the given messages.
     /// - Parameters:
     ///   - messages: The conversation history including the new user message
+    ///   - onIntermediateMessage: Called for each intermediate message (tool_use assistant / tool_result user) to persist
     ///   - onComplete: Called with the final assistant response and any tool calls made
     func run(
         messages: [Message],
+        onIntermediateMessage: @escaping (Message) -> Void = { _ in },
         onComplete: @escaping (String, [ToolCall]) -> Void
     ) {
         cancel() // Cancel any existing run
 
         currentTask = Task {
-            await executeLoop(messages: messages, onComplete: onComplete)
+            await executeLoop(messages: messages, onIntermediateMessage: onIntermediateMessage, onComplete: onComplete)
         }
     }
 
@@ -48,6 +50,7 @@ final class AgentLoop: ObservableObject {
 
     private func executeLoop(
         messages: [Message],
+        onIntermediateMessage: @escaping (Message) -> Void,
         onComplete: @escaping (String, [ToolCall]) -> Void
     ) async {
         var workingMessages = messages
@@ -59,31 +62,25 @@ final class AgentLoop: ObservableObject {
         Logger.shared.info("AgentLoop starting with \(messages.count) messages")
 
         while iterations < config.maxToolCalls {
-            // Check for cancellation
             if Task.isCancelled {
                 state = .cancelled
                 return
             }
 
-            // Call the LLM
             let response: AgentResponse
             do {
                 response = try await bedrockClient.sendMessage(
                     messages: workingMessages,
                     tools: toolRegistry.allTools
                 )
-                // Track token usage
                 TokenTracker.shared.add(usage: response.usage)
             } catch is CancellationError {
-                // Task was cancelled - exit silently without adding any message
                 state = .cancelled
                 return
             } catch let error as NSError where error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled {
-                // URLSession was cancelled - exit silently
                 state = .cancelled
                 return
             } catch let error as NSError where error.domain == NSURLErrorDomain && error.code == NSURLErrorTimedOut {
-                // Request timed out - likely due to extended thinking on complex query
                 Logger.shared.error("Request timed out after 300 seconds")
                 state = .error(error)
                 onComplete("The request timed out. This can happen with complex reasoning tasks. Try simplifying the question or starting a new conversation.", allToolCalls)
@@ -95,14 +92,12 @@ final class AgentLoop: ObservableObject {
                 return
             }
 
-            // If no tool calls, we're done
             if response.toolCalls.isEmpty {
                 state = .idle
                 onComplete(response.text, allToolCalls)
                 return
             }
 
-            // Process tool calls
             Logger.shared.info("Processing \(response.toolCalls.count) tool calls")
             var completedToolCalls: [ToolCall] = []
 
@@ -121,11 +116,9 @@ final class AgentLoop: ObservableObject {
                     toolCall.isError = false
                     Logger.shared.debug("Tool result: \(result.prefix(200))...")
                 } catch is CancellationError {
-                    // Task was cancelled during tool execution - exit silently
                     state = .cancelled
                     return
                 } catch let error as NSError where error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled {
-                    // URLSession was cancelled during tool execution - exit silently
                     state = .cancelled
                     return
                 } catch {
@@ -138,7 +131,7 @@ final class AgentLoop: ObservableObject {
                 allToolCalls.append(toolCall)
             }
 
-            // Add assistant message with tool calls and thinking blocks (no results yet)
+            // Add assistant message with tool calls and thinking blocks
             // Thinking blocks MUST be preserved and passed back for reasoning continuity
             let assistantMessage = Message(
                 conversationId: messages.first?.conversationId ?? UUID(),
@@ -148,6 +141,7 @@ final class AgentLoop: ObservableObject {
                 thinkingBlocks: response.thinkingBlocks.isEmpty ? nil : response.thinkingBlocks
             )
             workingMessages.append(assistantMessage)
+            onIntermediateMessage(assistantMessage)
             Logger.shared.debug("Added assistant message with \(response.toolCalls.count) tool_use blocks and \(response.thinkingBlocks.count) thinking blocks")
 
             // Add tool results as user message
@@ -158,6 +152,7 @@ final class AgentLoop: ObservableObject {
                 toolCalls: completedToolCalls
             )
             workingMessages.append(toolResultMessage)
+            onIntermediateMessage(toolResultMessage)
             Logger.shared.debug("Added user message with \(completedToolCalls.count) tool_result blocks")
 
             iterations += 1
@@ -168,7 +163,6 @@ final class AgentLoop: ObservableObject {
         Logger.shared.info("Max tool calls reached (\(config.maxToolCalls)), forcing final response")
         state = .thinking
 
-        // Add a message asking for synthesis
         let synthesisMessage = Message(
             conversationId: messages.first?.conversationId ?? UUID(),
             role: .user,
@@ -179,9 +173,8 @@ final class AgentLoop: ObservableObject {
         do {
             let finalResponse = try await bedrockClient.sendMessage(
                 messages: workingMessages,
-                tools: [] // No tools - force text response
+                tools: []
             )
-            // Track token usage
             TokenTracker.shared.add(usage: finalResponse.usage)
             let responseText = finalResponse.text.isEmpty
                 ? "I was unable to complete this request - the tool call limit was reached."

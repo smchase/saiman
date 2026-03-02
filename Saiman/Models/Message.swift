@@ -46,6 +46,34 @@ struct Message: Identifiable, Codable {
         self.toolUsageSummary = toolUsageSummary
         self.createdAt = createdAt
     }
+
+    /// Content with the dynamic context prefix stripped, for UI display.
+    /// Messages are stored with a `[Current date: ... | Location: ...]` prefix for API context/caching.
+    /// Old messages without the prefix are returned as-is.
+    var displayContent: String {
+        guard content.hasPrefix("[Current date:"),
+              let endRange = content.range(of: "]\n\n") else {
+            return content
+        }
+        return String(content[endRange.upperBound...])
+    }
+
+    /// Creates a user message with dynamic context (date/time/location) baked into the content.
+    /// The context is persisted in the DB so it stays stable across turns for prompt caching.
+    static func userMessage(
+        conversationId: UUID,
+        content: String,
+        attachments: [Attachment]? = nil
+    ) -> Message {
+        let context = Config.shared.dynamicContext()
+        let contentWithContext = "\(context)\n\n\(content)"
+        return Message(
+            conversationId: conversationId,
+            role: .user,
+            content: contentWithContext,
+            attachments: attachments
+        )
+    }
 }
 
 // Extension for converting to Bedrock API format

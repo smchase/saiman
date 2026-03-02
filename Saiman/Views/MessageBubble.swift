@@ -43,9 +43,9 @@ struct MessageBubble: View {
                 attachmentThumbnails(attachments)
             }
 
-            // Show text if present
-            if !message.content.isEmpty {
-                Text(message.content)
+            // Show text if present (strip dynamic context prefix used for API caching)
+            if !message.displayContent.isEmpty {
+                Text(message.displayContent)
                     .textSelection(.enabled)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)

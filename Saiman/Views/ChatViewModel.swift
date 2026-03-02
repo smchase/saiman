@@ -66,9 +66,14 @@ final class ChatViewModel: ObservableObject {
         isLoading = false
     }
 
+    /// Messages with tool calls are intermediate (tool_use/tool_result) and hidden from UI.
+    private static func isDisplayMessage(_ message: Message) -> Bool {
+        message.toolCalls == nil || message.toolCalls!.isEmpty
+    }
+
     func loadConversation(_ conversation: Conversation) {
         currentConversation = conversation
-        messages = database.getMessages(conversationId: conversation.id)
+        messages = database.getMessages(conversationId: conversation.id).filter(Self.isDisplayMessage)
         // Clear draft when navigating via menu (not session restore)
         inputText = ""
         pendingAttachments = []
@@ -139,10 +144,9 @@ final class ChatViewModel: ObservableObject {
             }
         }
 
-        // Create user message
-        let userMessage = Message(
+        // Create user message with dynamic context (date/time/location) baked in for prompt caching
+        let userMessage = Message.userMessage(
             conversationId: conversation.id,
-            role: .user,
             content: text,
             attachments: savedAttachments.isEmpty ? nil : savedAttachments
         )
@@ -171,16 +175,37 @@ final class ChatViewModel: ObservableObject {
                 self.agentStatusText = self.statusText(for: state)
             }
 
+        // Load ALL messages (including intermediates) for API context, not just UI-visible ones.
+        // The conversation and user message were already saved above, so getMessages includes everything.
+        var allMessages = database.getMessages(conversationId: conversation.id)
+
+        // Clean up orphaned messages from a previous interrupted turn (e.g., app crash
+        // during tool loop). Remove any intermediate tool messages, then remove any
+        // unanswered user message to ensure proper role alternation.
+        while allMessages.count >= 2 {
+            let beforeNew = allMessages[allMessages.count - 2]
+            guard beforeNew.toolCalls != nil && !beforeNew.toolCalls!.isEmpty else { break }
+            database.deleteMessage(id: beforeNew.id)
+            allMessages.remove(at: allMessages.count - 2)
+        }
+        if allMessages.count >= 2 && allMessages[allMessages.count - 2].role == .user {
+            database.deleteMessage(id: allMessages[allMessages.count - 2].id)
+            allMessages.remove(at: allMessages.count - 2)
+        }
+
         // Run agent (use per-conversation loop for concurrent requests)
-        loop.run(messages: messages) { [weak self] responseText, toolCalls in
+        loop.run(
+            messages: allMessages,
+            onIntermediateMessage: { [weak self] message in
+                // Persist intermediate tool_use/tool_result messages to DB for future context
+                self?.database.createMessage(message)
+            }
+        ) { [weak self] responseText, toolCalls in
             guard let self = self else { return }
 
-            // Generate tool usage summary (if any tools were used)
             let toolUsageSummary = Message.generateToolUsageSummary(from: toolCalls)
 
-            // Create and save assistant message to database (always, regardless of current conversation)
-            // Note: We don't save toolCalls - they're transient to this turn and not displayed.
-            // The model can re-invoke tools if needed when continuing the conversation.
+            // Save the final assistant message (no tool calls — this is the display message)
             let assistantMessage = Message(
                 conversationId: conversation.id,
                 role: .assistant,
@@ -211,7 +236,7 @@ final class ChatViewModel: ObservableObject {
 
             // Update title after each exchange (DB always, UI only if still current)
             Task {
-                if let title = await self.agentLoop(for: conversation.id).generateTitle(for: self.database.getMessages(conversationId: conversation.id)) {
+                if let title = await self.agentLoop(for: conversation.id).generateTitle(for: self.database.getMessages(conversationId: conversation.id).filter(Self.isDisplayMessage)) {
                     // Read fresh from DB to avoid overwriting newer timestamps from subsequent messages
                     if var conv = self.database.getConversation(id: conversation.id) {
                         conv.title = title
@@ -271,7 +296,12 @@ final class ChatViewModel: ObservableObject {
             pendingAttachments = pending.attachments
         }
 
-        // Remove the pending user message from UI and database
+        // Remove the pending user message and any intermediate tool messages from this turn.
+        // Intermediate messages (tool_use/tool_result) are persisted during the agent loop,
+        // so we need to clean them up on cancel to avoid orphaned messages.
+        if let userMessage = messages.first(where: { $0.id == pending.messageId }) {
+            database.deleteMessages(conversationId: conversation.id, after: userMessage.createdAt)
+        }
         messages.removeAll { $0.id == pending.messageId }
         database.deleteMessage(id: pending.messageId)
 

@@ -179,21 +179,19 @@ final class Config {
         }.resume()
     }
 
+    /// Static system prompt for caching — no dynamic content.
+    /// Dynamic context (date/time/location) is prepended to the user's message instead,
+    /// so the system prompt prefix stays identical across requests for cache hits.
     var systemPrompt: String {
+        baseSystemPrompt
+    }
+
+    /// Dynamic context string to prepend to the latest user message.
+    func dynamicContext() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMMM d, yyyy 'at' h:mm a"
         let dateTime = formatter.string(from: Date())
-
-        // Dynamic context prepended to base prompt
-        // All style/methodology guidance lives in system_prompt.txt
-        let context = """
-            ## Context
-            - Current date and time: \(dateTime)
-            - User's location: \(userLocation)
-
-            """
-
-        return context + baseSystemPrompt
+        return "[Current date: \(dateTime) | Location: \(userLocation)]"
     }
 
     // MARK: - Validation
