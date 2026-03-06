@@ -172,10 +172,11 @@ final class SpotlightPanelController: ObservableObject {
                 return nil
             }
 
-            // Cmd+V to paste images
+            // Cmd+V to paste images (but not when pasteboard is primarily text, e.g. from Word)
             if event.modifierFlags.contains(.command) && event.keyCode == 9 { // V key
                 let pasteboard = NSPasteboard.general
-                if pasteboard.canReadObject(forClasses: [NSImage.self], options: nil) ||
+                if pasteboard.string(forType: .string) == nil,
+                   pasteboard.canReadObject(forClasses: [NSImage.self], options: nil) ||
                    pasteboard.types?.contains(.fileURL) == true {
                     self.viewModel.handlePaste(from: pasteboard)
                     return nil
